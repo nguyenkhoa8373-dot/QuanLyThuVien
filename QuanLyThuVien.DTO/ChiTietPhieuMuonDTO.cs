@@ -12,5 +12,7 @@ namespace QuanLyThuVien.DTO
         public DateTime? NgayTra { get; set; }
         public decimal TienPhat { get; set; }
         public string TinhTrangKhiTra { get; set; }
+        public string TenSach { get; set; }
+        public string TrangThai { get; set; }
     }
 }

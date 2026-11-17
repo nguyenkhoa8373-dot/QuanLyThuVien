@@ -9,6 +9,7 @@ namespace QuanLyThuVien.DTO
         public string MaPhieu { get; set; }
         public string MaDG { get; set; }
         public DateTime NgayMuon { get; set; }
-        public string TrangThai { get; set; }
+        public string TenDocGia { get; set; }
+        public DateTime HanTra { get; set; }
     }
 }
