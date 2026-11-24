@@ -5,12 +5,38 @@ namespace QuanLyThuVien.BLL
 {
     public class SachBLL
     {
-        private readonly SachDAL sachDAL = new SachDAL();
-        private readonly PhieuMuonDAL phieuMuonDAL = new PhieuMuonDAL();
+        private const string LoiCSDL = "Lỗi truy cập cơ sở dữ liệu: ";
+        private const int SoLuongToiDa = 100000;
+
+        private readonly SachDAL sachDAL;
+        private readonly PhieuMuonDAL phieuMuonDAL;
+
+        public SachBLL() : this(new SachDAL(), new PhieuMuonDAL())
+        {
+        }
+
+        public SachBLL(SachDAL sachDAL, PhieuMuonDAL phieuMuonDAL)
+        {
+            this.sachDAL = sachDAL;
+            this.phieuMuonDAL = phieuMuonDAL;
+        }
 
         public List<SachDTO> LayDanhSachSach()
         {
             return sachDAL.LayDanhSachSach();
+        }
+
+        public SachDTO? LayTheoMa(string maSach)
+        {
+            if (string.IsNullOrWhiteSpace(maSach))
+            {
+                return null;
+            }
+
+            maSach = maSach.Trim();
+
+            return sachDAL.LayDanhSachSach()
+                .FirstOrDefault(s => string.Equals((s.MaSach ?? string.Empty).Trim(), maSach, StringComparison.OrdinalIgnoreCase));
         }
 
         public List<SachDTO> TimSach(string tuKhoa)
@@ -39,15 +65,27 @@ namespace QuanLyThuVien.BLL
                 return false;
             }
 
-            if (TonTai(sach.MaSach))
+            try
             {
-                thongBao = "Mã sách đã tồn tại.";
+                if (LayTheoMa(sach.MaSach) != null)
+                {
+                    thongBao = "Mã sách đã tồn tại.";
+                    return false;
+                }
+
+                bool ketQua = sachDAL.ThemSach(sach);
+
+                // DAL chỉ trả false, không cho biết nguyên nhân (ví dụ mã của sách đã xóa mềm vẫn chiếm khóa chính)
+                thongBao = ketQua
+                    ? "Thêm sách thành công."
+                    : "Không thể thêm sách. Mã có thể đã từng được sử dụng (sách đã xóa) hoặc lỗi kết nối CSDL.";
+                return ketQua;
+            }
+            catch (Exception ex)
+            {
+                thongBao = LoiCSDL + ex.Message;
                 return false;
             }
-
-            bool ketQua = sachDAL.ThemSach(sach);
-            thongBao = ketQua ? "Thêm sách thành công." : "Không thể thêm sách (mã có thể đã được dùng trước đây).";
-            return ketQua;
         }
 
         public bool SuaSach(SachDTO sach, out string thongBao)
@@ -57,15 +95,25 @@ namespace QuanLyThuVien.BLL
                 return false;
             }
 
-            if (!TonTai(sach.MaSach))
+            try
             {
-                thongBao = "Không tìm thấy mã sách cần sửa.";
+                if (LayTheoMa(sach.MaSach) == null)
+                {
+                    thongBao = "Không tìm thấy mã sách cần sửa.";
+                    return false;
+                }
+
+                // Lưu ý: SoLuongTon là số cuốn CÒN TRONG KHO (đã trừ số đang cho mượn),
+                // nên sửa trực tiếp ở đây là điều chỉnh tồn kho.
+                bool ketQua = sachDAL.SuaSach(sach);
+                thongBao = ketQua ? "Cập nhật sách thành công." : "Không thể cập nhật sách.";
+                return ketQua;
+            }
+            catch (Exception ex)
+            {
+                thongBao = LoiCSDL + ex.Message;
                 return false;
             }
-
-            bool ketQua = sachDAL.SuaSach(sach);
-            thongBao = ketQua ? "Cập nhật sách thành công." : "Không thể cập nhật sách.";
-            return ketQua;
         }
 
         public bool XoaSach(string maSach, out string thongBao)
@@ -78,30 +126,30 @@ namespace QuanLyThuVien.BLL
 
             maSach = maSach.Trim();
 
-            if (!TonTai(maSach))
+            try
             {
-                thongBao = "Không tìm thấy mã sách cần xóa.";
+                if (LayTheoMa(maSach) == null)
+                {
+                    thongBao = "Không tìm thấy mã sách cần xóa.";
+                    return false;
+                }
+
+                int dangMuon = TruyVanMuon.DemSachDangMuon(phieuMuonDAL, maSach);
+                if (dangMuon > 0)
+                {
+                    thongBao = $"Sách đang được mượn {dangMuon} cuốn chưa trả, không thể xóa.";
+                    return false;
+                }
+
+                bool ketQua = sachDAL.XoaSach(maSach);
+                thongBao = ketQua ? "Xóa sách thành công." : "Không thể xóa sách.";
+                return ketQua;
+            }
+            catch (Exception ex)
+            {
+                thongBao = LoiCSDL + ex.Message;
                 return false;
             }
-
-            int dangMuon = phieuMuonDAL.DemSoLuongDangMuonCuaSach(maSach);
-            if (dangMuon > 0)
-            {
-                thongBao = $"Sách đang được mượn ({dangMuon} cuốn chưa trả), không thể xóa.";
-                return false;
-            }
-
-            bool ketQua = sachDAL.XoaSach(maSach);
-            thongBao = ketQua ? "Xóa sách thành công." : "Không thể xóa sách.";
-            return ketQua;
-        }
-
-        // ================= HÀM PHỤ =================
-
-        private bool TonTai(string maSach)
-        {
-            return LayDanhSachSach().Any(s =>
-                string.Equals((s.MaSach ?? string.Empty).Trim(), maSach, StringComparison.OrdinalIgnoreCase));
         }
 
         private bool KiemTraSach(SachDTO sach, out string thongBao)
@@ -134,27 +182,15 @@ namespace QuanLyThuVien.BLL
                 return false;
             }
 
-            if (sach.MaSach.Length > 10)
-            {
-                thongBao = "Mã sách tối đa 10 ký tự.";
-                return false;
-            }
-
-            if (sach.TenSach.Length > 100)
-            {
-                thongBao = "Tên sách tối đa 100 ký tự.";
-                return false;
-            }
-
-            if (sach.TheLoai.Length > 50)
-            {
-                thongBao = "Thể loại tối đa 50 ký tự.";
-                return false;
-            }
-
             if (sach.SoLuongTon < 0)
             {
                 thongBao = "Số lượng tồn không được nhỏ hơn 0.";
+                return false;
+            }
+
+            if (sach.SoLuongTon > SoLuongToiDa)
+            {
+                thongBao = $"Số lượng tồn không được lớn hơn {SoLuongToiDa}.";
                 return false;
             }
 

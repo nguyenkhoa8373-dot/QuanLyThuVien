@@ -1,5 +1,4 @@
-﻿
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -8,32 +7,86 @@ namespace QuanLyThuVien.GUI.Views
 {
     public partial class QuanLyMuonSach : UserControl
     {
-        ObservableCollection<SachHienThi> danhSachSach = new();
+        private ObservableCollection<SachHienThi> danhSachSach = new();
 
         public QuanLyMuonSach()
         {
             InitializeComponent();
 
-            danhSachSach.Add(new SachHienThi { MaSach = 1, TenSach = "Lap trinh C#", TacGia = "Nguyen Van A", TheLoai = "Cong nghe", SoLuong = 10 });
-            danhSachSach.Add(new SachHienThi { MaSach = 2, TenSach = "Lap trinh C++", TacGia = "Nguyen Van B", TheLoai = "Cong nghe", SoLuong = 5 });
-            danhSachSach.Add(new SachHienThi { MaSach = 3, TenSach = "Dac nhan tam", TacGia = "Dale Carnegie", TheLoai = "Ky nang", SoLuong = 8 });
+            // Du lieu mau, se thay bang du lieu SQL sau
+            danhSachSach.Add(new SachHienThi
+            {
+                MaSach = "S001",
+                TenSach = "Lap trinh C#",
+                TheLoai = "Cong nghe",
+                SoLuongTon = 10
+            });
+
+            danhSachSach.Add(new SachHienThi
+            {
+                MaSach = "S002",
+                TenSach = "Lap trinh C++",
+                TheLoai = "Cong nghe",
+                SoLuongTon = 5
+            });
+
+            danhSachSach.Add(new SachHienThi
+            {
+                MaSach = "S003",
+                TenSach = "Dac nhan tam",
+                TheLoai = "Ky nang",
+                SoLuongTon = 8
+            });
 
             dgSach.ItemsSource = danhSachSach;
+        }
+
+        private bool KiemTraForm(out int soLuong)
+        {
+            soLuong = 0;
+
+            if (string.IsNullOrWhiteSpace(txtMaSach.Text) ||
+                string.IsNullOrWhiteSpace(txtTenSach.Text))
+            {
+                MessageBox.Show("Vui lòng nhập mã sách và tên sách!");
+                return false;
+            }
+
+            if (txtMaSach.Text.Trim().Length > 10 ||
+                txtTenSach.Text.Trim().Length > 100 ||
+                txtTheLoai.Text.Trim().Length > 50)
+            {
+                MessageBox.Show("Thông tin nhập vượt quá độ dài cho phép!");
+                return false;
+            }
+
+            if (!int.TryParse(txtSoLuong.Text, out soLuong) || soLuong < 0)
+            {
+                MessageBox.Show("Số lượng tồn phải là số nguyên không âm!");
+                return false;
+            }
+
+            return true;
         }
 
         private void ThemSach_Click(object sender, RoutedEventArgs e)
         {
             if (!KiemTraForm(out int soLuong)) return;
 
-            int ma = danhSachSach.Count == 0 ? 1 : danhSachSach.Max(s => s.MaSach) + 1;
+            string maSach = txtMaSach.Text.Trim();
+
+            if (danhSachSach.Any(s => s.MaSach == maSach))
+            {
+                MessageBox.Show("Mã sách đã tồn tại!");
+                return;
+            }
 
             danhSachSach.Add(new SachHienThi
             {
-                MaSach = ma,
+                MaSach = maSach,
                 TenSach = txtTenSach.Text.Trim(),
-                TacGia = txtTacGia.Text.Trim(),
                 TheLoai = txtTheLoai.Text.Trim(),
-                SoLuong = soLuong
+                SoLuongTon = soLuong
             });
 
             NhapLai();
@@ -48,12 +101,28 @@ namespace QuanLyThuVien.GUI.Views
                 return;
             }
 
-            if (!KiemTraForm(out int soLuong)) return;
+            if (string.IsNullOrWhiteSpace(txtTenSach.Text))
+            {
+                MessageBox.Show("Vui lòng nhập tên sách!");
+                return;
+            }
+
+            if (!int.TryParse(txtSoLuong.Text, out int soLuong) || soLuong < 0)
+            {
+                MessageBox.Show("Số lượng tồn phải là số nguyên không âm!");
+                return;
+            }
+
+            if (txtTenSach.Text.Trim().Length > 100 ||
+                txtTheLoai.Text.Trim().Length > 50)
+            {
+                MessageBox.Show("Thông tin nhập vượt quá độ dài cho phép!");
+                return;
+            }
 
             sach.TenSach = txtTenSach.Text.Trim();
-            sach.TacGia = txtTacGia.Text.Trim();
             sach.TheLoai = txtTheLoai.Text.Trim();
-            sach.SoLuong = soLuong;
+            sach.SoLuongTon = soLuong;
 
             dgSach.Items.Refresh();
             NhapLai();
@@ -68,8 +137,9 @@ namespace QuanLyThuVien.GUI.Views
                 return;
             }
 
-            if (MessageBox.Show("Bạn có chắc muốn xóa sách này?", "Xác nhận",
-                MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            if (MessageBox.Show("Bạn có chắc muốn xóa sách này?",
+                "Xác nhận", MessageBoxButton.YesNo,
+                MessageBoxImage.Question) == MessageBoxResult.Yes)
             {
                 danhSachSach.Remove(sach);
                 NhapLai();
@@ -77,35 +147,14 @@ namespace QuanLyThuVien.GUI.Views
             }
         }
 
-        private bool KiemTraForm(out int soLuong)
-        {
-            soLuong = 0;
-
-            if (string.IsNullOrWhiteSpace(txtTenSach.Text) ||
-                string.IsNullOrWhiteSpace(txtTacGia.Text) ||
-                string.IsNullOrWhiteSpace(txtTheLoai.Text))
-            {
-                MessageBox.Show("Vui lòng nhập đầy đủ thông tin sách!");
-                return false;
-            }
-
-            if (!int.TryParse(txtSoLuong.Text, out soLuong) || soLuong < 0)
-            {
-                MessageBox.Show("Số lượng phải là số nguyên không âm!");
-                return false;
-            }
-
-            return true;
-        }
-
         private void dgSach_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (dgSach.SelectedItem is SachHienThi sach)
             {
+                txtMaSach.Text = sach.MaSach;
                 txtTenSach.Text = sach.TenSach;
-                txtTacGia.Text = sach.TacGia;
                 txtTheLoai.Text = sach.TheLoai;
-                txtSoLuong.Text = sach.SoLuong.ToString();
+                txtSoLuong.Text = sach.SoLuongTon.ToString();
             }
         }
 
@@ -116,9 +165,10 @@ namespace QuanLyThuVien.GUI.Views
             dgSach.ItemsSource = string.IsNullOrWhiteSpace(tuKhoa)
                 ? danhSachSach
                 : danhSachSach.Where(s =>
+                    s.MaSach.Contains(tuKhoa, System.StringComparison.OrdinalIgnoreCase) ||
                     s.TenSach.Contains(tuKhoa, System.StringComparison.OrdinalIgnoreCase) ||
-                    s.TacGia.Contains(tuKhoa, System.StringComparison.OrdinalIgnoreCase) ||
-                    s.TheLoai.Contains(tuKhoa, System.StringComparison.OrdinalIgnoreCase)).ToList();
+                    s.TheLoai.Contains(tuKhoa, System.StringComparison.OrdinalIgnoreCase))
+                  .ToList();
         }
 
         private void HienTatCa_Click(object sender, RoutedEventArgs e)
@@ -134,8 +184,8 @@ namespace QuanLyThuVien.GUI.Views
 
         private void NhapLai()
         {
+            txtMaSach.Clear();
             txtTenSach.Clear();
-            txtTacGia.Clear();
             txtTheLoai.Clear();
             txtSoLuong.Clear();
             dgSach.SelectedItem = null;
@@ -145,10 +195,9 @@ namespace QuanLyThuVien.GUI.Views
 
     public class SachHienThi
     {
-        public int MaSach { get; set; }
+        public string MaSach { get; set; } = "";
         public string TenSach { get; set; } = "";
-        public string TacGia { get; set; } = "";
         public string TheLoai { get; set; } = "";
-        public int SoLuong { get; set; }
+        public int SoLuongTon { get; set; }
     }
 }

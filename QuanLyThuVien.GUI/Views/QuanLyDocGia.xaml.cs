@@ -1,76 +1,143 @@
 ﻿
 using System;
-using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using QuanLyThuVien.BLL;
 using QuanLyThuVien.DTO;
 
 namespace QuanLyThuVien.GUI.Views
 {
     public partial class QuanLyDocGia : UserControl
     {
-        // Kết nối tầng nghiệp vụ
-        private readonly DocGiaBLL docGiaBLL = new DocGiaBLL();
-
-        // Danh sách độc giả
-        private List<DocGiaDTO> danhSachDocGia = new();
+        // Danh sách độc giả tạm thời
+        // Sau này sẽ thay bằng dữ liệu lấy từ SQL Server
+        private ObservableCollection<DocGiaDTO> danhSachDocGia = new();
 
         public QuanLyDocGia()
         {
             InitializeComponent();
 
-            // Tải dữ liệu khi mở màn hình
+            // Hiển thị danh sách khi mở giao diện
             TaiDanhSachDocGia();
         }
 
-        // 1. Tải danh sách độc giả
+        // 1. Hiển thị danh sách độc giả
         private void TaiDanhSachDocGia()
         {
-            try
-            {
-                danhSachDocGia = docGiaBLL.LayDanhSachDocGia();
-                dgDocGia.ItemsSource = danhSachDocGia;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(
-                    "Không thể tải danh sách độc giả: " + ex.Message,
-                    "Lỗi",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
-            }
+            dgDocGia.ItemsSource = null;
+
+            dgDocGia.ItemsSource = danhSachDocGia
+                .Where(dg => !dg.IsDeleted)
+                .ToList();
         }
 
-        // 2. Thêm độc giả
+        // 2. Kiểm tra thông tin nhập
+        private bool KiemTraForm()
+        {
+            string maDocGia = txtMaDocGia.Text.Trim();
+            string hoTen = txtHoTen.Text.Trim();
+            string soDienThoai = txtSoDienThoai.Text.Trim();
+            string diaChi = txtDiaChi.Text.Trim();
+
+            if (string.IsNullOrWhiteSpace(maDocGia))
+            {
+                MessageBox.Show("Vui lòng nhập mã độc giả!");
+                txtMaDocGia.Focus();
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(hoTen))
+            {
+                MessageBox.Show("Vui lòng nhập họ và tên!");
+                txtHoTen.Focus();
+                return false;
+            }
+
+            // Kiểm tra độ dài theo SQL
+            if (maDocGia.Length > 10)
+            {
+                MessageBox.Show("Mã độc giả không được quá 10 ký tự!");
+                return false;
+            }
+
+            if (hoTen.Length > 100)
+            {
+                MessageBox.Show("Họ tên không được quá 100 ký tự!");
+                return false;
+            }
+
+            if (soDienThoai.Length > 15)
+            {
+                MessageBox.Show("Số điện thoại không được quá 15 ký tự!");
+                return false;
+            }
+
+            if (diaChi.Length > 200)
+            {
+                MessageBox.Show("Địa chỉ không được quá 200 ký tự!");
+                return false;
+            }
+
+            // SQL cho phép số điện thoại NULL.
+            // Nếu có nhập thì chỉ nhận chữ số.
+            if (!string.IsNullOrWhiteSpace(soDienThoai) &&
+                !soDienThoai.All(char.IsDigit))
+            {
+                MessageBox.Show("Số điện thoại chỉ được nhập chữ số!");
+                return false;
+            }
+
+            return true;
+        }
+
+        // 3. Thêm độc giả
         private void ThemDocGia_Click(object sender, RoutedEventArgs e)
         {
             if (!KiemTraForm())
                 return;
 
+            string maDocGia = txtMaDocGia.Text.Trim();
+
+            // Kiểm tra mã độc giả đã tồn tại
+            bool daTonTai = danhSachDocGia.Any(dg =>
+                dg.MaDocGia.Equals(
+                    maDocGia,
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (daTonTai)
+            {
+                MessageBox.Show("Mã độc giả đã tồn tại!");
+                return;
+            }
+
             DocGiaDTO docGia = new DocGiaDTO
             {
-                MaDocGia = txtMaDocGia.Text.Trim(),
+                MaDocGia = maDocGia,
                 TenDocGia = txtHoTen.Text.Trim(),
-                SoDienThoai = txtSoDienThoai.Text.Trim(),
-                DiaChi = txtDiaChi.Text.Trim()
+
+                // Cho phép bỏ trống số điện thoại
+                SoDienThoai = string.IsNullOrWhiteSpace(txtSoDienThoai.Text)
+                    ? null
+                    : txtSoDienThoai.Text.Trim(),
+
+                // Cho phép bỏ trống địa chỉ
+                DiaChi = string.IsNullOrWhiteSpace(txtDiaChi.Text)
+                    ? null
+                    : txtDiaChi.Text.Trim(),
+
+                IsDeleted = false
             };
 
-            bool ketQua = docGiaBLL.ThemDocGia(
-                docGia, out string thongBao);
+            danhSachDocGia.Add(docGia);
 
-            txtThongBaoDG.Text = thongBao;
+            TaiDanhSachDocGia();
+            NhapLai();
 
-            if (ketQua)
-            {
-                TaiDanhSachDocGia();
-                NhapLai();
-                txtThongBaoDG.Text = thongBao;
-            }
+            txtThongBaoDG.Text = "Thêm độc giả thành công!";
         }
 
-        // 3. Sửa thông tin độc giả
+        // 4. Sửa thông tin độc giả
         private void SuaDocGia_Click(object sender, RoutedEventArgs e)
         {
             if (dgDocGia.SelectedItem is not DocGiaDTO docGia)
@@ -82,25 +149,26 @@ namespace QuanLyThuVien.GUI.Views
             if (!KiemTraForm())
                 return;
 
-            // Giữ nguyên mã độc giả đã chọn
+            // Không cho thay đổi mã độc giả
             docGia.TenDocGia = txtHoTen.Text.Trim();
-            docGia.SoDienThoai = txtSoDienThoai.Text.Trim();
-            docGia.DiaChi = txtDiaChi.Text.Trim();
 
-            bool ketQua = docGiaBLL.SuaDocGia(
-                docGia, out string thongBao);
+            docGia.SoDienThoai =
+                string.IsNullOrWhiteSpace(txtSoDienThoai.Text)
+                ? null
+                : txtSoDienThoai.Text.Trim();
 
-            txtThongBaoDG.Text = thongBao;
+            docGia.DiaChi =
+                string.IsNullOrWhiteSpace(txtDiaChi.Text)
+                ? null
+                : txtDiaChi.Text.Trim();
 
-            if (ketQua)
-            {
-                TaiDanhSachDocGia();
-                NhapLai();
-                txtThongBaoDG.Text = thongBao;
-            }
+            TaiDanhSachDocGia();
+            NhapLai();
+
+            txtThongBaoDG.Text = "Cập nhật thông tin thành công!";
         }
 
-        // 4. Xóa độc giả
+        // 5. Xóa độc giả
         private void XoaDocGia_Click(object sender, RoutedEventArgs e)
         {
             if (dgDocGia.SelectedItem is not DocGiaDTO docGia)
@@ -109,100 +177,98 @@ namespace QuanLyThuVien.GUI.Views
                 return;
             }
 
-            MessageBoxResult xacNhan = MessageBox.Show(
-                "Bạn có chắc muốn xóa độc giả " +
-                docGia.TenDocGia + "?",
+            MessageBoxResult ketQua = MessageBox.Show(
+                "Bạn có chắc chắn muốn xóa độc giả "
+                + docGia.TenDocGia + "?",
                 "Xác nhận xóa",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
-            if (xacNhan != MessageBoxResult.Yes)
+            if (ketQua != MessageBoxResult.Yes)
                 return;
 
-            bool ketQua = docGiaBLL.XoaDocGia(
-                docGia.MaDocGia, out string thongBao);
+            // Đánh dấu xóa tạm thời
+            // Khi kết nối SQL sẽ chuyển thành IsDeleted = 1
+            docGia.IsDeleted = true;
 
-            txtThongBaoDG.Text = thongBao;
+            TaiDanhSachDocGia();
+            NhapLai();
 
-            if (ketQua)
-            {
-                TaiDanhSachDocGia();
-                NhapLai();
-                txtThongBaoDG.Text = thongBao;
-            }
-        }
-
-        // 5. Kiểm tra dữ liệu nhập
-        private bool KiemTraForm()
-        {
-            if (string.IsNullOrWhiteSpace(txtMaDocGia.Text) ||
-                string.IsNullOrWhiteSpace(txtHoTen.Text))
-            {
-                MessageBox.Show(
-                    "Vui lòng nhập mã độc giả và họ tên!");
-
-                return false;
-            }
-
-            string soDienThoai = txtSoDienThoai.Text.Trim();
-
-            if (soDienThoai.Length > 0 &&
-                (soDienThoai.Length != 10 ||
-                 soDienThoai[0] != '0' ||
-                 !soDienThoai.All(char.IsDigit)))
-            {
-                MessageBox.Show(
-                    "Số điện thoại phải có 10 chữ số và bắt đầu bằng 0!");
-
-                return false;
-            }
-
-            return true;
+            txtThongBaoDG.Text = "Xóa độc giả thành công!";
         }
 
         // 6. Chọn độc giả trên bảng
         private void dgDocGia_SelectionChanged(
-            object sender, SelectionChangedEventArgs e)
+            object sender,
+            SelectionChangedEventArgs e)
         {
             if (dgDocGia.SelectedItem is DocGiaDTO docGia)
             {
                 txtMaDocGia.Text = docGia.MaDocGia;
                 txtHoTen.Text = docGia.TenDocGia;
-                txtSoDienThoai.Text = docGia.SoDienThoai;
-                txtDiaChi.Text = docGia.DiaChi;
+                txtSoDienThoai.Text = docGia.SoDienThoai ?? "";
+                txtDiaChi.Text = docGia.DiaChi ?? "";
 
-                // Không cho sửa mã khi đang cập nhật
+                // Không cho sửa mã độc giả
                 txtMaDocGia.IsReadOnly = true;
             }
         }
 
         // 7. Tìm kiếm độc giả
-        private void TimKiemDG_Click(object sender, RoutedEventArgs e)
+        private void TimKiemDG_Click(
+            object sender,
+            RoutedEventArgs e)
         {
-            try
-            {
-                string tuKhoa = txtTimKiemDG.Text.Trim();
+            string tuKhoa = txtTimKiemDG.Text.Trim();
 
-                dgDocGia.ItemsSource = string.IsNullOrWhiteSpace(tuKhoa)
-                    ? docGiaBLL.LayDanhSachDocGia()
-                    : docGiaBLL.TimDocGia(tuKhoa);
-            }
-            catch (Exception ex)
+            if (string.IsNullOrWhiteSpace(tuKhoa))
             {
-                MessageBox.Show(
-                    "Lỗi tìm kiếm: " + ex.Message);
+                TaiDanhSachDocGia();
+                return;
             }
+
+            var ketQua = danhSachDocGia
+                .Where(dg => !dg.IsDeleted)
+                .Where(dg =>
+                    dg.MaDocGia.Contains(
+                        tuKhoa,
+                        StringComparison.OrdinalIgnoreCase)
+
+                    || dg.TenDocGia.Contains(
+                        tuKhoa,
+                        StringComparison.OrdinalIgnoreCase)
+
+                    || (dg.SoDienThoai ?? "").Contains(
+                        tuKhoa,
+                        StringComparison.OrdinalIgnoreCase)
+
+                    || (dg.DiaChi ?? "").Contains(
+                        tuKhoa,
+                        StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            dgDocGia.ItemsSource = ketQua;
+
+            txtThongBaoDG.Text =
+                "Tìm thấy " + ketQua.Count + " độc giả.";
         }
 
         // 8. Hiển thị tất cả độc giả
-        private void HienTatCaDG_Click(object sender, RoutedEventArgs e)
+        private void HienTatCaDG_Click(
+            object sender,
+            RoutedEventArgs e)
         {
             txtTimKiemDG.Clear();
+
             TaiDanhSachDocGia();
+
+            txtThongBaoDG.Text = "Đã hiển thị tất cả độc giả.";
         }
 
         // 9. Nhập lại thông tin
-        private void NhapLai_Click(object sender, RoutedEventArgs e)
+        private void NhapLai_Click(
+            object sender,
+            RoutedEventArgs e)
         {
             NhapLai();
         }
@@ -217,6 +283,7 @@ namespace QuanLyThuVien.GUI.Views
             txtMaDocGia.IsReadOnly = false;
 
             dgDocGia.SelectedItem = null;
+
             txtThongBaoDG.Text = "";
         }
     }
