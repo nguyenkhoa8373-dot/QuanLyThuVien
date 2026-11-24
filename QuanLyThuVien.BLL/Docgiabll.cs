@@ -1,4 +1,3 @@
-using System.Data.SqlClient;
 using System.Text.RegularExpressions;
 using QuanLyThuVien.DAL;
 using QuanLyThuVien.DTO;
@@ -7,25 +6,15 @@ namespace QuanLyThuVien.BLL
 {
     public class DocGiaBLL
     {
-        private const string LoiCSDL = "Lỗi truy cập cơ sở dữ liệu: ";
-
         // Số điện thoại VN: 10 chữ số, bắt đầu bằng 0
         private static readonly Regex MauSoDienThoai = new Regex(@"^0\d{9}$");
 
-        private readonly IDocGiaRepository docGiaRepo;
-
-        // Tùy chọn: có thì XoaDocGia sẽ kiểm tra độc giả còn sách chưa trả.
-        private readonly IPhieuMuonRepository? phieuMuonRepo;
-
-        public DocGiaBLL(IDocGiaRepository docGiaRepo, IPhieuMuonRepository? phieuMuonRepo = null)
-        {
-            this.docGiaRepo = docGiaRepo;
-            this.phieuMuonRepo = phieuMuonRepo;
-        }
+        private readonly DocGiaDAL docGiaDAL = new DocGiaDAL();
+        private readonly PhieuMuonDAL phieuMuonDAL = new PhieuMuonDAL();
 
         public List<DocGiaDTO> LayDanhSachDocGia()
         {
-            return docGiaRepo.LayDanhSachDocGia();
+            return docGiaDAL.LayDanhSachDocGia();
         }
 
         public List<DocGiaDTO> TimDocGia(string tuKhoa)
@@ -41,8 +30,8 @@ namespace QuanLyThuVien.BLL
 
             return danhSach
                 .Where(dg =>
-                    (dg.MaDG?.Contains(tuKhoa, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (dg.TenDG?.Contains(tuKhoa, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (dg.MaDocGia?.Contains(tuKhoa, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (dg.TenDocGia?.Contains(tuKhoa, StringComparison.OrdinalIgnoreCase) ?? false) ||
                     (dg.SoDienThoai?.Contains(tuKhoa, StringComparison.OrdinalIgnoreCase) ?? false))
                 .ToList();
         }
@@ -54,28 +43,15 @@ namespace QuanLyThuVien.BLL
                 return false;
             }
 
-            try
+            if (TonTai(docGia.MaDocGia))
             {
-                if (TimTheoMa(docGia.MaDG) != null)
-                {
-                    thongBao = "Mã độc giả đã tồn tại.";
-                    return false;
-                }
+                thongBao = "Mã độc giả đã tồn tại.";
+                return false;
+            }
 
-                bool ketQua = docGiaRepo.ThemDocGia(docGia);
-                thongBao = ketQua ? "Thêm độc giả thành công." : "Không thể thêm độc giả.";
-                return ketQua;
-            }
-            catch (SqlException ex) when (ex.Number == 2627 || ex.Number == 2601)
-            {
-                thongBao = "Mã độc giả này đã được dùng trước đây. Vui lòng dùng mã khác.";
-                return false;
-            }
-            catch (Exception ex)
-            {
-                thongBao = LoiCSDL + ex.Message;
-                return false;
-            }
+            bool ketQua = docGiaDAL.ThemDocGia(docGia);
+            thongBao = ketQua ? "Thêm độc giả thành công." : "Không thể thêm độc giả (mã có thể đã được dùng trước đây).";
+            return ketQua;
         }
 
         public bool SuaDocGia(DocGiaDTO docGia, out string thongBao)
@@ -85,70 +61,51 @@ namespace QuanLyThuVien.BLL
                 return false;
             }
 
-            try
+            if (!TonTai(docGia.MaDocGia))
             {
-                if (TimTheoMa(docGia.MaDG) == null)
-                {
-                    thongBao = "Không tìm thấy mã độc giả cần sửa.";
-                    return false;
-                }
-
-                bool ketQua = docGiaRepo.SuaDocGia(docGia);
-                thongBao = ketQua ? "Cập nhật độc giả thành công." : "Không thể cập nhật độc giả.";
-                return ketQua;
-            }
-            catch (Exception ex)
-            {
-                thongBao = LoiCSDL + ex.Message;
+                thongBao = "Không tìm thấy mã độc giả cần sửa.";
                 return false;
             }
+
+            bool ketQua = docGiaDAL.SuaDocGia(docGia);
+            thongBao = ketQua ? "Cập nhật độc giả thành công." : "Không thể cập nhật độc giả.";
+            return ketQua;
         }
 
-        public bool XoaDocGia(string maDG, out string thongBao)
+        public bool XoaDocGia(string maDocGia, out string thongBao)
         {
-            if (string.IsNullOrWhiteSpace(maDG))
+            if (string.IsNullOrWhiteSpace(maDocGia))
             {
                 thongBao = "Mã độc giả không được để trống.";
                 return false;
             }
 
-            maDG = maDG.Trim();
+            maDocGia = maDocGia.Trim();
 
-            try
+            if (!TonTai(maDocGia))
             {
-                if (TimTheoMa(maDG) == null)
-                {
-                    thongBao = "Không tìm thấy mã độc giả cần xóa.";
-                    return false;
-                }
-
-                if (phieuMuonRepo != null)
-                {
-                    int dangMuon = TruyVanMuon.DemSachDangMuonCuaDocGia(phieuMuonRepo, maDG);
-                    if (dangMuon > 0)
-                    {
-                        thongBao = $"Độc giả còn {dangMuon} cuốn sách chưa trả, không thể xóa.";
-                        return false;
-                    }
-                }
-
-                bool ketQua = docGiaRepo.XoaDocGia(maDG);
-                thongBao = ketQua ? "Xóa độc giả thành công." : "Không thể xóa độc giả.";
-                return ketQua;
-            }
-            catch (Exception ex)
-            {
-                thongBao = LoiCSDL + ex.Message;
+                thongBao = "Không tìm thấy mã độc giả cần xóa.";
                 return false;
             }
+
+            int dangMuon = phieuMuonDAL.DemSachDangMuonCuaDocGia(maDocGia);
+            if (dangMuon > 0)
+            {
+                thongBao = $"Độc giả còn {dangMuon} cuốn sách chưa trả, không thể xóa.";
+                return false;
+            }
+
+            bool ketQua = docGiaDAL.XoaDocGia(maDocGia);
+            thongBao = ketQua ? "Xóa độc giả thành công." : "Không thể xóa độc giả.";
+            return ketQua;
         }
 
         // ================= HÀM PHỤ =================
 
-        private DocGiaDTO? TimTheoMa(string maDG)
+        private bool TonTai(string maDocGia)
         {
-            return docGiaRepo.LayDanhSachDocGia()
-                .FirstOrDefault(d => string.Equals((d.MaDG ?? string.Empty).Trim(), maDG, StringComparison.OrdinalIgnoreCase));
+            return LayDanhSachDocGia().Any(d =>
+                string.Equals((d.MaDocGia ?? string.Empty).Trim(), maDocGia, StringComparison.OrdinalIgnoreCase));
         }
 
         private bool KiemTraDocGia(DocGiaDTO docGia, out string thongBao)
@@ -159,17 +116,17 @@ namespace QuanLyThuVien.BLL
                 return false;
             }
 
-            docGia.MaDG = (docGia.MaDG ?? string.Empty).Trim();
-            docGia.TenDG = (docGia.TenDG ?? string.Empty).Trim();
+            docGia.MaDocGia = (docGia.MaDocGia ?? string.Empty).Trim();
+            docGia.TenDocGia = (docGia.TenDocGia ?? string.Empty).Trim();
             docGia.SoDienThoai = (docGia.SoDienThoai ?? string.Empty).Trim();
 
-            if (docGia.MaDG.Length == 0)
+            if (docGia.MaDocGia.Length == 0)
             {
                 thongBao = "Mã độc giả không được để trống.";
                 return false;
             }
 
-            if (docGia.TenDG.Length == 0)
+            if (docGia.TenDocGia.Length == 0)
             {
                 thongBao = "Tên độc giả không được để trống.";
                 return false;

@@ -224,5 +224,33 @@ namespace QuanLyThuVien.DAL
             }
             return list;
         }
+        // ==========================================
+        // 5. ĐẾM SỐ SÁCH ĐỘC GIẢ ĐANG MƯỢN (chưa trả)
+        // ==========================================
+        public int DemSachDangMuonCuaDocGia(string maDocGia)
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
+                {
+                    conn.Open();
+                    string query = @"
+                        SELECT ISNULL(SUM(ct.SoLuongMuon), 0)
+                        FROM ChiTietPhieuMuon ct
+                        JOIN PhieuMuon pm ON ct.MaPhieu = pm.MaPhieu
+                        WHERE pm.MaDocGia = @MaDocGia AND ct.TrangThai = N'Đang mượn'";
+                    using (SqlCommand cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@MaDocGia", maDocGia);
+                        return Convert.ToInt32(cmd.ExecuteScalar());
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Lỗi đếm sách đang mượn: " + ex.Message);
+                return 0;
+            }
+        }
     }
 }
