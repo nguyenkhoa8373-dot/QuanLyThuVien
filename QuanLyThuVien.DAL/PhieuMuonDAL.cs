@@ -20,17 +20,14 @@ namespace QuanLyThuVien.DAL
                 {
                     try
                     {
-                        // SỬA: bổ sung cột TrangThai theo đúng schema PhieuMuon
                         string queryPhieu = @"
                             INSERT INTO PhieuMuon (MaPhieu, MaDocGia, NgayMuon, HanTra, TrangThai)
                             VALUES (@MaPhieu, @MaDocGia, @NgayMuon, @HanTra, @TrangThai)";
                         using (SqlCommand cmdPhieu = new SqlCommand(queryPhieu, conn, transaction))
                         {
                             cmdPhieu.Parameters.Add("@MaPhieu", SqlDbType.VarChar, 10).Value = phieuMuon.MaPhieu;
-                            // SỬA: MaDG -> MaDocGia, xử lý NULL (cột cho phép NULL)
                             cmdPhieu.Parameters.Add("@MaDocGia", SqlDbType.VarChar, 10).Value =
                                 (object)phieuMuon.MaDocGia ?? DBNull.Value;
-                            // SỬA: NgayMuon / HanTra là DateTime? -> cần DBNull.Value
                             cmdPhieu.Parameters.Add("@NgayMuon", SqlDbType.DateTime).Value =
                                 (object)phieuMuon.NgayMuon ?? (object)DBNull.Value;
                             cmdPhieu.Parameters.Add("@HanTra", SqlDbType.DateTime).Value =
@@ -43,9 +40,11 @@ namespace QuanLyThuVien.DAL
                         string queryChiTiet = @"
                             INSERT INTO ChiTietPhieuMuon (MaPhieu, MaSach, SoLuongMuon, TrangThai)
                             VALUES (@MaPhieu, @MaSach, @SoLuongMuon, N'Đang mượn')";
+
+                        // ĐÃ SỬA LỖI 3: Dùng ISNULL để tránh lỗi nếu SoLuongTon đang là NULL
                         string queryTruSach = @"
-                            UPDATE Sach SET SoLuongTon = SoLuongTon - @SoLuongMuon
-                            WHERE MaSach = @MaSach AND SoLuongTon >= @SoLuongMuon";
+                            UPDATE Sach SET SoLuongTon = ISNULL(SoLuongTon, 0) - @SoLuongMuon
+                            WHERE MaSach = @MaSach AND ISNULL(SoLuongTon, 0) >= @SoLuongMuon";
 
                         foreach (var chiTiet in danhSachChiTiet)
                         {
@@ -112,7 +111,6 @@ namespace QuanLyThuVien.DAL
                             }
                         }
 
-                        // THÊM: chặn trường hợp phiếu không còn gì để trả
                         if (danhSachChiTiet.Count == 0)
                         {
                             transaction.Rollback();
@@ -120,7 +118,11 @@ namespace QuanLyThuVien.DAL
                             return false;
                         }
 
-                        string queryHoanSach = "UPDATE Sach SET SoLuongTon = SoLuongTon + @SoLuongMuon WHERE MaSach = @MaSach";
+                        // ĐÃ SỬA LỖI 3: Dùng ISNULL để tránh lỗi nếu SoLuongTon đang là NULL
+                        string queryHoanSach = @"
+                            UPDATE Sach 
+                            SET SoLuongTon = ISNULL(SoLuongTon, 0) + @SoLuongMuon 
+                            WHERE MaSach = @MaSach";
 
                         string queryCapNhat = @"
                             UPDATE ChiTietPhieuMuon 
@@ -151,7 +153,6 @@ namespace QuanLyThuVien.DAL
                             }
                         }
 
-                        // THÊM: đóng phiếu mượn khi mọi chi tiết đã trả (bản cũ thiếu hoàn toàn)
                         string queryDongPhieu = @"
                             UPDATE PhieuMuon SET TrangThai = N'Đã trả'
                             WHERE MaPhieu = @MaPhieu
@@ -187,7 +188,6 @@ namespace QuanLyThuVien.DAL
             using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
             {
                 conn.Open();
-                // SỬA: LEFT JOIN vì MaDocGia cho phép NULL; lấy thêm TrangThai + DiaChi
                 string query = @"
                     SELECT pm.MaPhieu, pm.MaDocGia, dg.TenDocGia, dg.DiaChi,
                            pm.NgayMuon, pm.HanTra, pm.TrangThai
@@ -201,11 +201,9 @@ namespace QuanLyThuVien.DAL
                     {
                         PhieuMuonDTO pm = new PhieuMuonDTO();
                         pm.MaPhieu = reader["MaPhieu"].ToString();
-                        // SỬA: MaDG -> MaDocGia + xử lý DBNull
                         pm.MaDocGia = reader["MaDocGia"] == DBNull.Value ? null : reader["MaDocGia"].ToString();
                         pm.TenDocGia = reader["TenDocGia"] == DBNull.Value ? null : reader["TenDocGia"].ToString();
                         pm.DiaChi = reader["DiaChi"] == DBNull.Value ? null : reader["DiaChi"].ToString();
-                        // SỬA: NgayMuon / HanTra NULLABLE
                         pm.NgayMuon = reader["NgayMuon"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(reader["NgayMuon"]);
                         pm.HanTra = reader["HanTra"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(reader["HanTra"]);
                         pm.TrangThai = reader["TrangThai"] == DBNull.Value ? null : reader["TrangThai"].ToString();
@@ -225,7 +223,6 @@ namespace QuanLyThuVien.DAL
             using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
             {
                 conn.Open();
-                // SỬA: bổ sung TienPhat + TinhTrangKhiTra theo đúng schema
                 string query = @"
                     SELECT ct.MaPhieu, ct.MaSach, s.TenSach, ct.SoLuongMuon,
                            ct.TrangThai, ct.NgayTra, ct.TienPhat, ct.TinhTrangKhiTra
@@ -272,7 +269,6 @@ namespace QuanLyThuVien.DAL
                 using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
                 {
                     conn.Open();
-                    // SỬA: thêm JOIN DocGia để lọc IsDeleted = 0
                     string query = @"
                         SELECT ISNULL(SUM(ct.SoLuongMuon), 0)
                         FROM ChiTietPhieuMuon ct
@@ -294,7 +290,10 @@ namespace QuanLyThuVien.DAL
                 return 0;
             }
         }
-        // 6. ĐẾM SỐ LƯỢNG ĐANG MƯỢN CỦA 1 CUỐN SÁCH (Dùng cho SachBLL)
+
+        // ==========================================
+        // 6. ĐẾM SỐ LƯỢNG ĐANG MƯỢN CỦA 1 CUỐN SÁCH
+        // ==========================================
         public int DemSoLuongDangMuonCuaSach(string maSach)
         {
             try
