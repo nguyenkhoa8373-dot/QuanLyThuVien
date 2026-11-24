@@ -1,272 +1,204 @@
 ﻿
 using System;
-using System.Collections.ObjectModel;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using QuanLyThuVien.DTO;
+using QuanLyThuVien.BLL;
 
 namespace QuanLyThuVien.GUI.Views
 {
     public partial class QuanLyDocGia : UserControl
     {
-        // Su dung danh sach doc gia dung chung
-        private ObservableCollection<DocGiaDTO> danhSachDocGia;
+        private readonly DocGiaBLL docGiaBLL = new DocGiaBLL();
 
         public QuanLyDocGia()
         {
             InitializeComponent();
-
-            // Lay du lieu tu kho du lieu chung
-            danhSachDocGia = DuLieuDocGia.DanhSach;
-
-            TaiDanhSachDocGia();
+            LoadDocGia();
         }
 
-        // 1. Hien thi danh sach doc gia
-        private void TaiDanhSachDocGia()
+        // 1. Tai danh sach doc gia tu SQL
+        private void LoadDocGia()
         {
-            dgDocGia.ItemsSource = null;
-
-            dgDocGia.ItemsSource = danhSachDocGia
-                .Where(dg => !dg.IsDeleted)
-                .ToList();
+            try
+            {
+                dgDocGia.ItemsSource = docGiaBLL.LayDanhSachDocGia();
+                txtThongBaoDG.Text = "";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Khong the tai danh sach doc gia: " + ex.Message,
+                    "Loi ket noi",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
         }
 
         // 2. Kiem tra thong tin nhap
         private bool KiemTraForm()
         {
-            string maDocGia = txtMaDocGia.Text.Trim();
-            string hoTen = txtHoTen.Text.Trim();
-            string soDienThoai = txtSoDienThoai.Text.Trim();
-            string diaChi = txtDiaChi.Text.Trim();
+            string ma = txtMaDocGia.Text.Trim();
+            string ten = txtHoTen.Text.Trim();
+            string sdt = txtSoDienThoai.Text.Trim();
 
-            if (string.IsNullOrWhiteSpace(maDocGia))
+            if (string.IsNullOrWhiteSpace(ma))
             {
-                MessageBox.Show("Vui lòng nhập mã độc giả!");
+                MessageBox.Show("Vui long nhap ma doc gia!");
                 txtMaDocGia.Focus();
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(hoTen))
+            if (string.IsNullOrWhiteSpace(ten))
             {
-                MessageBox.Show("Vui lòng nhập họ và tên!");
+                MessageBox.Show("Vui long nhap ho ten!");
                 txtHoTen.Focus();
                 return false;
             }
 
-            if (maDocGia.Length > 10)
+            if (string.IsNullOrWhiteSpace(sdt))
             {
-                MessageBox.Show("Mã độc giả không được quá 10 ký tự!");
+                MessageBox.Show("Vui long nhap so dien thoai!");
+                txtSoDienThoai.Focus();
                 return false;
             }
 
-            if (hoTen.Length > 100)
+            if (ma.Length > 10 || ten.Length > 100)
             {
-                MessageBox.Show("Họ tên không được quá 100 ký tự!");
+                MessageBox.Show("Thong tin vuot qua do dai cho phep!");
                 return false;
             }
 
-            if (soDienThoai.Length > 15)
+            if (sdt.Length != 10 ||
+                !sdt.StartsWith("0") ||
+                !long.TryParse(sdt, out _))
             {
-                MessageBox.Show("Số điện thoại không được quá 15 ký tự!");
-                return false;
-            }
-
-            if (diaChi.Length > 200)
-            {
-                MessageBox.Show("Địa chỉ không được quá 200 ký tự!");
-                return false;
-            }
-
-            if (!string.IsNullOrWhiteSpace(soDienThoai) &&
-                !soDienThoai.All(char.IsDigit))
-            {
-                MessageBox.Show("Số điện thoại chỉ được nhập chữ số!");
+                MessageBox.Show(
+                    "So dien thoai phai gom 10 chu so va bat dau bang 0!");
+                txtSoDienThoai.Focus();
                 return false;
             }
 
             return true;
         }
 
-        // 3. Them doc gia
+        // 3. Them doc gia vao SQL
         private void ThemDocGia_Click(object sender, RoutedEventArgs e)
         {
             if (!KiemTraForm())
                 return;
 
-            string maDocGia = txtMaDocGia.Text.Trim();
-
-            // Kiem tra trung ma
-            bool daTonTai = danhSachDocGia.Any(dg =>
-                dg.MaDocGia.Equals(
-                    maDocGia,
-                    StringComparison.OrdinalIgnoreCase));
-
-            if (daTonTai)
+            DocGiaDTO dg = new DocGiaDTO
             {
-                MessageBox.Show("Mã độc giả đã tồn tại!");
-                return;
-            }
-
-            DocGiaDTO docGia = new DocGiaDTO
-            {
-                MaDocGia = maDocGia,
+                MaDocGia = txtMaDocGia.Text.Trim(),
                 TenDocGia = txtHoTen.Text.Trim(),
-
-                SoDienThoai = string.IsNullOrWhiteSpace(txtSoDienThoai.Text)
-                    ? null
-                    : txtSoDienThoai.Text.Trim(),
-
-                DiaChi = string.IsNullOrWhiteSpace(txtDiaChi.Text)
-                    ? null
-                    : txtDiaChi.Text.Trim(),
-
+                SoDienThoai = txtSoDienThoai.Text.Trim(),
+                DiaChi = txtDiaChi.Text.Trim(),
                 IsDeleted = false
             };
 
-            danhSachDocGia.Add(docGia);
+            try
+            {
+                bool ketQua = docGiaBLL.ThemDocGia(
+                    dg, out string thongBao);
 
-            TaiDanhSachDocGia();
+                MessageBox.Show(thongBao);
 
-            NhapLai();
-
-            txtThongBaoDG.Text = "Thêm độc giả thành công!";
+                if (ketQua)
+                {
+                    LoadDocGia();
+                    NhapLai();
+                    txtThongBaoDG.Text = "Them doc gia thanh cong!";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Loi them doc gia: " + ex.Message);
+            }
         }
 
-        // 4. Sua thong tin doc gia
+        // 4. Sua doc gia trong SQL
         private void SuaDocGia_Click(object sender, RoutedEventArgs e)
         {
-            if (dgDocGia.SelectedItem is not DocGiaDTO docGia)
+            if (dgDocGia.SelectedItem is not DocGiaDTO dgCu)
             {
-                MessageBox.Show("Vui lòng chọn độc giả cần sửa!");
+                MessageBox.Show("Vui long chon doc gia can sua!");
                 return;
             }
 
             if (!KiemTraForm())
                 return;
 
-            // Khong cho thay doi ma doc gia
-            docGia.TenDocGia = txtHoTen.Text.Trim();
+            DocGiaDTO dgMoi = new DocGiaDTO
+            {
+                MaDocGia = dgCu.MaDocGia,
+                TenDocGia = txtHoTen.Text.Trim(),
+                SoDienThoai = txtSoDienThoai.Text.Trim(),
+                DiaChi = txtDiaChi.Text.Trim(),
+                IsDeleted = false
+            };
 
-            docGia.SoDienThoai =
-                string.IsNullOrWhiteSpace(txtSoDienThoai.Text)
-                ? null
-                : txtSoDienThoai.Text.Trim();
+            try
+            {
+                bool ketQua = docGiaBLL.SuaDocGia(
+                    dgMoi, out string thongBao);
 
-            docGia.DiaChi =
-                string.IsNullOrWhiteSpace(txtDiaChi.Text)
-                ? null
-                : txtDiaChi.Text.Trim();
+                MessageBox.Show(thongBao);
 
-            TaiDanhSachDocGia();
-
-            NhapLai();
-
-            txtThongBaoDG.Text = "Cập nhật thông tin thành công!";
+                if (ketQua)
+                {
+                    LoadDocGia();
+                    NhapLai();
+                    txtThongBaoDG.Text = "Cap nhat doc gia thanh cong!";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Loi sua doc gia: " + ex.Message);
+            }
         }
 
-        // 5. Xoa doc gia
+        // 5. Xoa doc gia trong SQL
         private void XoaDocGia_Click(object sender, RoutedEventArgs e)
         {
-            if (dgDocGia.SelectedItem is not DocGiaDTO docGia)
+            if (dgDocGia.SelectedItem is not DocGiaDTO dg)
             {
-                MessageBox.Show("Vui lòng chọn độc giả cần xóa!");
+                MessageBox.Show("Vui long chon doc gia can xoa!");
                 return;
             }
 
-            MessageBoxResult ketQua = MessageBox.Show(
-                "Bạn có chắc chắn muốn xóa độc giả "
-                + docGia.TenDocGia + "?",
-                "Xác nhận xóa",
+            MessageBoxResult xacNhan = MessageBox.Show(
+                "Ban co chac chan muon xoa doc gia "
+                + dg.TenDocGia + "?",
+                "Xac nhan xoa",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
 
-            if (ketQua != MessageBoxResult.Yes)
+            if (xacNhan != MessageBoxResult.Yes)
                 return;
 
-            // Xoa mem
-            docGia.IsDeleted = true;
-
-            TaiDanhSachDocGia();
-
-            NhapLai();
-
-            txtThongBaoDG.Text = "Xóa độc giả thành công!";
-        }
-
-        // 6. Chon doc gia tren bang
-        private void dgDocGia_SelectionChanged(
-            object sender,
-            SelectionChangedEventArgs e)
-        {
-            if (dgDocGia.SelectedItem is DocGiaDTO docGia)
+            try
             {
-                txtMaDocGia.Text = docGia.MaDocGia;
-                txtHoTen.Text = docGia.TenDocGia;
-                txtSoDienThoai.Text = docGia.SoDienThoai ?? "";
-                txtDiaChi.Text = docGia.DiaChi ?? "";
+                bool ketQua = docGiaBLL.XoaDocGia(
+                    dg.MaDocGia, out string thongBao);
 
-                // Khong cho sua ma doc gia
-                txtMaDocGia.IsReadOnly = true;
+                MessageBox.Show(thongBao);
+
+                if (ketQua)
+                {
+                    LoadDocGia();
+                    NhapLai();
+                    txtThongBaoDG.Text = "Xoa doc gia thanh cong!";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Loi xoa doc gia: " + ex.Message);
             }
         }
 
-        // 7. Tim kiem doc gia
-        private void TimKiemDG_Click(
-            object sender,
-            RoutedEventArgs e)
-        {
-            string tuKhoa = txtTimKiemDG.Text.Trim();
-
-            if (string.IsNullOrWhiteSpace(tuKhoa))
-            {
-                TaiDanhSachDocGia();
-                return;
-            }
-
-            var ketQua = danhSachDocGia
-                .Where(dg => !dg.IsDeleted)
-                .Where(dg =>
-                    dg.MaDocGia.Contains(
-                        tuKhoa,
-                        StringComparison.OrdinalIgnoreCase)
-
-                    || dg.TenDocGia.Contains(
-                        tuKhoa,
-                        StringComparison.OrdinalIgnoreCase)
-
-                    || (dg.SoDienThoai ?? "").Contains(
-                        tuKhoa,
-                        StringComparison.OrdinalIgnoreCase)
-
-                    || (dg.DiaChi ?? "").Contains(
-                        tuKhoa,
-                        StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            dgDocGia.ItemsSource = ketQua;
-
-            txtThongBaoDG.Text =
-                "Tìm thấy " + ketQua.Count + " độc giả.";
-        }
-
-        // 8. Hien thi tat ca doc gia
-        private void HienTatCaDG_Click(
-            object sender,
-            RoutedEventArgs e)
-        {
-            txtTimKiemDG.Clear();
-
-            TaiDanhSachDocGia();
-
-            txtThongBaoDG.Text = "Đã hiển thị tất cả độc giả.";
-        }
-
-        // 9. Nhap lai thong tin
-        private void NhapLai_Click(
-            object sender,
-            RoutedEventArgs e)
+        // 6. Nhap lai form
+        private void NhapLai_Click(object sender, RoutedEventArgs e)
         {
             NhapLai();
         }
@@ -284,45 +216,52 @@ namespace QuanLyThuVien.GUI.Views
 
             txtThongBaoDG.Text = "";
         }
-    }
 
-    // Kho du lieu doc gia dung chung
-    public static class DuLieuDocGia
-    {
-        public static ObservableCollection<DocGiaDTO> DanhSach { get; }
-            = KhoiTaoDuLieu();
-
-        private static ObservableCollection<DocGiaDTO> KhoiTaoDuLieu()
+        // 7. Tim kiem doc gia
+        private void TimKiemDG_Click(object sender, RoutedEventArgs e)
         {
-            return new ObservableCollection<DocGiaDTO>
+            try
             {
-                new DocGiaDTO
-                {
-                    MaDocGia = "DG001",
-                    TenDocGia = "Nguyen Van An",
-                    SoDienThoai = "0987654321",
-                    DiaChi = "Ha Noi",
-                    IsDeleted = false
-                },
+                string tuKhoa = txtTimKiemDG.Text.Trim();
 
-                new DocGiaDTO
-                {
-                    MaDocGia = "DG002",
-                    TenDocGia = "Tran Thi Binh",
-                    SoDienThoai = "0912345678",
-                    DiaChi = "Vinh Phuc",
-                    IsDeleted = false
-                },
+                var ketQua = docGiaBLL.TimDocGia(tuKhoa);
 
-                new DocGiaDTO
-                {
-                    MaDocGia = "DG003",
-                    TenDocGia = "Le Van Cuong",
-                    SoDienThoai = "0978123456",
-                    DiaChi = "Bac Ninh",
-                    IsDeleted = false
-                }
-            };
+                dgDocGia.ItemsSource = ketQua;
+
+                txtThongBaoDG.Text =
+                    "Tim thay " + ketQua.Count + " doc gia.";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Loi tim kiem: " + ex.Message);
+            }
+        }
+
+        // 8. Hien thi tat ca doc gia
+        private void HienTatCaDG_Click(object sender, RoutedEventArgs e)
+        {
+            txtTimKiemDG.Clear();
+
+            LoadDocGia();
+
+            txtThongBaoDG.Text = "Da hien thi tat ca doc gia.";
+        }
+
+        // 9. Chon doc gia tren DataGrid
+        private void dgDocGia_SelectionChanged(
+            object sender,
+            SelectionChangedEventArgs e)
+        {
+            if (dgDocGia.SelectedItem is DocGiaDTO dg)
+            {
+                txtMaDocGia.Text = dg.MaDocGia;
+                txtHoTen.Text = dg.TenDocGia;
+                txtSoDienThoai.Text = dg.SoDienThoai ?? "";
+                txtDiaChi.Text = dg.DiaChi ?? "";
+
+                // Khong cho sua ma doc gia
+                txtMaDocGia.IsReadOnly = true;
+            }
         }
     }
 }
