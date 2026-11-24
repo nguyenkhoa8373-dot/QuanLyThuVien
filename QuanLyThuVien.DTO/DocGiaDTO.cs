@@ -1,14 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace QuanLyThuVien.DTO
+﻿namespace QuanLyThuVien.DTO
 {
     public class DocGiaDTO
     {
-        public string MaDocGia { get; set; }
-        public string TenDocGia { get; set; }
-        public string SoDienThoai { get; set; }
-        public string DiaChi { get; set; }
+        public string MaDocGia { get; set; } = string.Empty; // NOT NULL
+        public string TenDocGia { get; set; } = string.Empty; // NOT NULL
+        public string? SoDienThoai { get; set; } // NULL
+        public string? DiaChi { get; set; } // NULL
+        public bool IsDeleted { get; set; } // NOT NULL
     }
 }

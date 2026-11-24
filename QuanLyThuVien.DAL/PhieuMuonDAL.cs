@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.SqlClient;
 using QuanLyThuVien.DTO;
 
@@ -15,57 +16,69 @@ namespace QuanLyThuVien.DAL
             using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
             {
                 conn.Open();
-                SqlTransaction transaction = conn.BeginTransaction();
-
-                try
+                using (SqlTransaction transaction = conn.BeginTransaction())
                 {
-                    // Lưu phiếu mượn
-                    string queryPhieu = "INSERT INTO PhieuMuon (MaPhieu, MaDocGia, NgayMuon, HanTra) VALUES (@MaPhieu, @MaDocGia, @NgayMuon, @HanTra)";
-                    using (SqlCommand cmdPhieu = new SqlCommand(queryPhieu, conn, transaction))
+                    try
                     {
-                        cmdPhieu.Parameters.AddWithValue("@MaPhieu", phieuMuon.MaPhieu);
-                        cmdPhieu.Parameters.AddWithValue("@MaDocGia", phieuMuon.MaDG);
-                        cmdPhieu.Parameters.AddWithValue("@NgayMuon", phieuMuon.NgayMuon);
-                        cmdPhieu.Parameters.AddWithValue("@HanTra", phieuMuon.HanTra);
-                        cmdPhieu.ExecuteNonQuery();
-                    }
-
-                    // Lưu chi tiết & Trừ kho
-                    string queryChiTiet = "INSERT INTO ChiTietPhieuMuon (MaPhieu, MaSach, SoLuongMuon, TrangThai) VALUES (@MaPhieu, @MaSach, @SoLuongMuon, N'Đang mượn')";
-                    string queryTruSach = "UPDATE Sach SET SoLuongTon = SoLuongTon - @SoLuongMuon WHERE MaSach = @MaSach AND SoLuongTon >= @SoLuongMuon";
-
-                    foreach (var chiTiet in danhSachChiTiet)
-                    {
-                        using (SqlCommand cmdChiTiet = new SqlCommand(queryChiTiet, conn, transaction))
+                        // SỬA: bổ sung cột TrangThai theo đúng schema PhieuMuon
+                        string queryPhieu = @"
+                            INSERT INTO PhieuMuon (MaPhieu, MaDocGia, NgayMuon, HanTra, TrangThai)
+                            VALUES (@MaPhieu, @MaDocGia, @NgayMuon, @HanTra, @TrangThai)";
+                        using (SqlCommand cmdPhieu = new SqlCommand(queryPhieu, conn, transaction))
                         {
-                            cmdChiTiet.Parameters.AddWithValue("@MaPhieu", phieuMuon.MaPhieu);
-                            cmdChiTiet.Parameters.AddWithValue("@MaSach", chiTiet.MaSach);
-                            cmdChiTiet.Parameters.AddWithValue("@SoLuongMuon", chiTiet.SoLuongMuon);
-                            cmdChiTiet.ExecuteNonQuery();
+                            cmdPhieu.Parameters.Add("@MaPhieu", SqlDbType.VarChar, 10).Value = phieuMuon.MaPhieu;
+                            // SỬA: MaDG -> MaDocGia, xử lý NULL (cột cho phép NULL)
+                            cmdPhieu.Parameters.Add("@MaDocGia", SqlDbType.VarChar, 10).Value =
+                                (object)phieuMuon.MaDocGia ?? DBNull.Value;
+                            // SỬA: NgayMuon / HanTra là DateTime? -> cần DBNull.Value
+                            cmdPhieu.Parameters.Add("@NgayMuon", SqlDbType.DateTime).Value =
+                                (object)phieuMuon.NgayMuon ?? (object)DBNull.Value;
+                            cmdPhieu.Parameters.Add("@HanTra", SqlDbType.DateTime).Value =
+                                (object)phieuMuon.HanTra ?? (object)DBNull.Value;
+                            cmdPhieu.Parameters.Add("@TrangThai", SqlDbType.NVarChar, 50).Value =
+                                (object)phieuMuon.TrangThai ?? "Đang mượn";
+                            cmdPhieu.ExecuteNonQuery();
                         }
 
-                        using (SqlCommand cmdTruSach = new SqlCommand(queryTruSach, conn, transaction))
-                        {
-                            cmdTruSach.Parameters.AddWithValue("@SoLuongMuon", chiTiet.SoLuongMuon);
-                            cmdTruSach.Parameters.AddWithValue("@MaSach", chiTiet.MaSach);
+                        string queryChiTiet = @"
+                            INSERT INTO ChiTietPhieuMuon (MaPhieu, MaSach, SoLuongMuon, TrangThai)
+                            VALUES (@MaPhieu, @MaSach, @SoLuongMuon, N'Đang mượn')";
+                        string queryTruSach = @"
+                            UPDATE Sach SET SoLuongTon = SoLuongTon - @SoLuongMuon
+                            WHERE MaSach = @MaSach AND SoLuongTon >= @SoLuongMuon";
 
-                            if (cmdTruSach.ExecuteNonQuery() == 0)
+                        foreach (var chiTiet in danhSachChiTiet)
+                        {
+                            using (SqlCommand cmdChiTiet = new SqlCommand(queryChiTiet, conn, transaction))
                             {
-                                throw new Exception($"Sách mã {chiTiet.MaSach} không đủ số lượng tồn kho!");
+                                cmdChiTiet.Parameters.Add("@MaPhieu", SqlDbType.VarChar, 10).Value = phieuMuon.MaPhieu;
+                                cmdChiTiet.Parameters.Add("@MaSach", SqlDbType.VarChar, 10).Value = chiTiet.MaSach;
+                                cmdChiTiet.Parameters.Add("@SoLuongMuon", SqlDbType.Int).Value = chiTiet.SoLuongMuon;
+                                cmdChiTiet.ExecuteNonQuery();
+                            }
+
+                            using (SqlCommand cmdTruSach = new SqlCommand(queryTruSach, conn, transaction))
+                            {
+                                cmdTruSach.Parameters.Add("@SoLuongMuon", SqlDbType.Int).Value = chiTiet.SoLuongMuon;
+                                cmdTruSach.Parameters.Add("@MaSach", SqlDbType.VarChar, 10).Value = chiTiet.MaSach;
+
+                                if (cmdTruSach.ExecuteNonQuery() == 0)
+                                    throw new Exception($"Sách mã {chiTiet.MaSach} không đủ số lượng tồn kho!");
                             }
                         }
+                        transaction.Commit();
+                        return true;
                     }
-                    transaction.Commit();
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    transaction.Rollback();
-                    Console.WriteLine("Lỗi tạo phiếu mượn: " + ex.Message);
-                    return false;
+                    catch (Exception ex)
+                    {
+                        transaction.Rollback();
+                        Console.WriteLine("Lỗi tạo phiếu mượn: " + ex.Message);
+                        return false;
+                    }
                 }
             }
         }
+
         // ==========================================
         // 2. TRẢ SÁCH (Đã tích hợp tự động tính Tiền Phạt)
         // ==========================================
@@ -74,77 +87,99 @@ namespace QuanLyThuVien.DAL
             using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
             {
                 conn.Open();
-                SqlTransaction transaction = conn.BeginTransaction();
-
-                try
+                using (SqlTransaction transaction = conn.BeginTransaction())
                 {
-                    // Lấy chi tiết sách đang mượn
-                    List<ChiTietPhieuMuonDTO> danhSachChiTiet = new List<ChiTietPhieuMuonDTO>();
-                    string queryLayChiTiet = "SELECT MaSach, SoLuongMuon FROM ChiTietPhieuMuon WHERE MaPhieu = @MaPhieu AND TrangThai = N'Đang mượn'";
-                    using (SqlCommand cmdLay = new SqlCommand(queryLayChiTiet, conn, transaction))
+                    try
                     {
-                        cmdLay.Parameters.AddWithValue("@MaPhieu", maPhieu);
-                        using (SqlDataReader reader = cmdLay.ExecuteReader())
+                        // Lấy chi tiết sách đang mượn
+                        List<ChiTietPhieuMuonDTO> danhSachChiTiet = new List<ChiTietPhieuMuonDTO>();
+                        string queryLayChiTiet = @"
+                            SELECT MaSach, SoLuongMuon
+                            FROM ChiTietPhieuMuon
+                            WHERE MaPhieu = @MaPhieu AND TrangThai = N'Đang mượn'";
+                        using (SqlCommand cmdLay = new SqlCommand(queryLayChiTiet, conn, transaction))
                         {
-                            while (reader.Read())
+                            cmdLay.Parameters.Add("@MaPhieu", SqlDbType.VarChar, 10).Value = maPhieu;
+                            using (SqlDataReader reader = cmdLay.ExecuteReader())
                             {
-                                ChiTietPhieuMuonDTO chiTiet = new ChiTietPhieuMuonDTO();
-                                chiTiet.MaSach = reader["MaSach"].ToString();
-                                chiTiet.SoLuongMuon = Convert.ToInt32(reader["SoLuongMuon"]);
-                                danhSachChiTiet.Add(chiTiet);
+                                while (reader.Read())
+                                {
+                                    ChiTietPhieuMuonDTO chiTiet = new ChiTietPhieuMuonDTO();
+                                    chiTiet.MaSach = reader["MaSach"].ToString();
+                                    chiTiet.SoLuongMuon = Convert.ToInt32(reader["SoLuongMuon"]);
+                                    danhSachChiTiet.Add(chiTiet);
+                                }
                             }
                         }
+
+                        // THÊM: chặn trường hợp phiếu không còn gì để trả
+                        if (danhSachChiTiet.Count == 0)
+                        {
+                            transaction.Rollback();
+                            Console.WriteLine($"Không có sách nào đang mượn cho phiếu {maPhieu}.");
+                            return false;
+                        }
+
+                        string queryHoanSach = "UPDATE Sach SET SoLuongTon = SoLuongTon + @SoLuongMuon WHERE MaSach = @MaSach";
+
+                        string queryCapNhat = @"
+                            UPDATE ChiTietPhieuMuon 
+                            SET TrangThai = N'Đã trả', 
+                                NgayTra = @NgayTra,
+                                TienPhat = CASE 
+                                               WHEN DATEDIFF(day, (SELECT HanTra FROM PhieuMuon WHERE MaPhieu = @MaPhieu), @NgayTra) > 0 
+                                               THEN DATEDIFF(day, (SELECT HanTra FROM PhieuMuon WHERE MaPhieu = @MaPhieu), @NgayTra) * 5000
+                                               ELSE 0 
+                                           END
+                            WHERE MaPhieu = @MaPhieu AND MaSach = @MaSach";
+
+                        foreach (var chiTiet in danhSachChiTiet)
+                        {
+                            using (SqlCommand cmdHoan = new SqlCommand(queryHoanSach, conn, transaction))
+                            {
+                                cmdHoan.Parameters.Add("@SoLuongMuon", SqlDbType.Int).Value = chiTiet.SoLuongMuon;
+                                cmdHoan.Parameters.Add("@MaSach", SqlDbType.VarChar, 10).Value = chiTiet.MaSach;
+                                cmdHoan.ExecuteNonQuery();
+                            }
+
+                            using (SqlCommand cmdCapNhat = new SqlCommand(queryCapNhat, conn, transaction))
+                            {
+                                cmdCapNhat.Parameters.Add("@NgayTra", SqlDbType.DateTime).Value = DateTime.Now;
+                                cmdCapNhat.Parameters.Add("@MaPhieu", SqlDbType.VarChar, 10).Value = maPhieu;
+                                cmdCapNhat.Parameters.Add("@MaSach", SqlDbType.VarChar, 10).Value = chiTiet.MaSach;
+                                cmdCapNhat.ExecuteNonQuery();
+                            }
+                        }
+
+                        // THÊM: đóng phiếu mượn khi mọi chi tiết đã trả (bản cũ thiếu hoàn toàn)
+                        string queryDongPhieu = @"
+                            UPDATE PhieuMuon SET TrangThai = N'Đã trả'
+                            WHERE MaPhieu = @MaPhieu
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM ChiTietPhieuMuon
+                                  WHERE MaPhieu = @MaPhieu AND TrangThai <> N'Đã trả'
+                              )";
+                        using (SqlCommand cmdDong = new SqlCommand(queryDongPhieu, conn, transaction))
+                        {
+                            cmdDong.Parameters.Add("@MaPhieu", SqlDbType.VarChar, 10).Value = maPhieu;
+                            cmdDong.ExecuteNonQuery();
+                        }
+
+                        transaction.Commit();
+                        return true;
                     }
-
-                    // Hoàn lại sách vào kho
-                    string queryHoanSach = "UPDATE Sach SET SoLuongTon = SoLuongTon + @SoLuongMuon WHERE MaSach = @MaSach";
-
-                    // Cập nhật trạng thái và TỰ ĐỘNG TÍNH TIỀN PHẠT (Dùng DATEDIFF so sánh Ngày Trả và Hạn Trả)
-                    string queryCapNhat = @"
-                        UPDATE ChiTietPhieuMuon 
-                        SET TrangThai = N'Đã trả', 
-                            NgayTra = @NgayTra,
-                            TienPhat = CASE 
-                                           WHEN DATEDIFF(day, (SELECT HanTra FROM PhieuMuon WHERE MaPhieu = @MaPhieu), @NgayTra) > 0 
-                                           THEN DATEDIFF(day, (SELECT HanTra FROM PhieuMuon WHERE MaPhieu = @MaPhieu), @NgayTra) * 5000
-                                           ELSE 0 
-                                       END
-                        WHERE MaPhieu = @MaPhieu AND MaSach = @MaSach";
-
-                    foreach (var chiTiet in danhSachChiTiet)
+                    catch (Exception ex)
                     {
-                        // Cộng kho
-                        using (SqlCommand cmdHoan = new SqlCommand(queryHoanSach, conn, transaction))
-                        {
-                            cmdHoan.Parameters.AddWithValue("@SoLuongMuon", chiTiet.SoLuongMuon);
-                            cmdHoan.Parameters.AddWithValue("@MaSach", chiTiet.MaSach);
-                            cmdHoan.ExecuteNonQuery();
-                        }
-
-                        // Cập nhật phiếu chi tiết & Tiền phạt
-                        using (SqlCommand cmdCapNhat = new SqlCommand(queryCapNhat, conn, transaction))
-                        {
-                            cmdCapNhat.Parameters.AddWithValue("@NgayTra", DateTime.Now);
-                            cmdCapNhat.Parameters.AddWithValue("@MaPhieu", maPhieu);
-                            cmdCapNhat.Parameters.AddWithValue("@MaSach", chiTiet.MaSach);
-                            cmdCapNhat.ExecuteNonQuery();
-                        }
+                        transaction.Rollback();
+                        Console.WriteLine("Lỗi trả sách: " + ex.Message);
+                        return false;
                     }
-
-                    transaction.Commit();
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    transaction.Rollback();
-                    Console.WriteLine("Lỗi trả sách: " + ex.Message);
-                    return false;
                 }
             }
         }
 
         // ==========================================
-        // 3. LẤY DANH SÁCH PHIẾU MƯỢN (Dùng JOIN lấy Tên Độc Giả)
+        // 3. LẤY DANH SÁCH PHIẾU MƯỢN (JOIN lấy Tên Độc Giả)
         // ==========================================
         public List<PhieuMuonDTO> LayDanhSachPhieuMuon()
         {
@@ -152,28 +187,29 @@ namespace QuanLyThuVien.DAL
             using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
             {
                 conn.Open();
+                // SỬA: LEFT JOIN vì MaDocGia cho phép NULL; lấy thêm TrangThai + DiaChi
                 string query = @"
-                    SELECT pm.MaPhieu, pm.MaDocGia, dg.TenDocGia, pm.NgayMuon, pm.HanTra 
-                    FROM PhieuMuon pm 
-                    JOIN DocGia dg ON pm.MaDocGia = dg.MaDocGia";
+                    SELECT pm.MaPhieu, pm.MaDocGia, dg.TenDocGia, dg.DiaChi,
+                           pm.NgayMuon, pm.HanTra, pm.TrangThai
+                    FROM PhieuMuon pm
+                    LEFT JOIN DocGia dg ON pm.MaDocGia = dg.MaDocGia";
 
                 using (SqlCommand cmd = new SqlCommand(query, conn))
+                using (SqlDataReader reader = cmd.ExecuteReader())
                 {
-                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    while (reader.Read())
                     {
-                        while (reader.Read())
-                        {
-                            PhieuMuonDTO pm = new PhieuMuonDTO();
-                            pm.MaPhieu = reader["MaPhieu"].ToString();
-                            pm.MaDG = reader["MaDocGia"].ToString();
-
-                            // Đòi hỏi bạn phải thêm public string TenDocGia { get; set; } vào PhieuMuonDTO.cs
-                            pm.TenDocGia = reader["TenDocGia"].ToString();
-
-                            pm.NgayMuon = Convert.ToDateTime(reader["NgayMuon"]);
-                            pm.HanTra = Convert.ToDateTime(reader["HanTra"]);
-                            list.Add(pm);
-                        }
+                        PhieuMuonDTO pm = new PhieuMuonDTO();
+                        pm.MaPhieu = reader["MaPhieu"].ToString();
+                        // SỬA: MaDG -> MaDocGia + xử lý DBNull
+                        pm.MaDocGia = reader["MaDocGia"] == DBNull.Value ? null : reader["MaDocGia"].ToString();
+                        pm.TenDocGia = reader["TenDocGia"] == DBNull.Value ? null : reader["TenDocGia"].ToString();
+                        pm.DiaChi = reader["DiaChi"] == DBNull.Value ? null : reader["DiaChi"].ToString();
+                        // SỬA: NgayMuon / HanTra NULLABLE
+                        pm.NgayMuon = reader["NgayMuon"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(reader["NgayMuon"]);
+                        pm.HanTra = reader["HanTra"] == DBNull.Value ? (DateTime?)null : Convert.ToDateTime(reader["HanTra"]);
+                        pm.TrangThai = reader["TrangThai"] == DBNull.Value ? null : reader["TrangThai"].ToString();
+                        list.Add(pm);
                     }
                 }
             }
@@ -181,7 +217,7 @@ namespace QuanLyThuVien.DAL
         }
 
         // ==========================================
-        // 4. LẤY CHI TIẾT 1 PHIẾU MƯỢN (Dùng JOIN lấy Tên Sách)
+        // 4. LẤY CHI TIẾT 1 PHIẾU MƯỢN (JOIN lấy Tên Sách)
         // ==========================================
         public List<ChiTietPhieuMuonDTO> LayChiTietCuaPhieu(string maPhieu)
         {
@@ -189,15 +225,17 @@ namespace QuanLyThuVien.DAL
             using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
             {
                 conn.Open();
+                // SỬA: bổ sung TienPhat + TinhTrangKhiTra theo đúng schema
                 string query = @"
-                    SELECT ct.MaPhieu, ct.MaSach, s.TenSach, ct.SoLuongMuon, ct.TrangThai, ct.NgayTra 
-                    FROM ChiTietPhieuMuon ct 
-                    JOIN Sach s ON ct.MaSach = s.MaSach 
+                    SELECT ct.MaPhieu, ct.MaSach, s.TenSach, ct.SoLuongMuon,
+                           ct.TrangThai, ct.NgayTra, ct.TienPhat, ct.TinhTrangKhiTra
+                    FROM ChiTietPhieuMuon ct
+                    JOIN Sach s ON ct.MaSach = s.MaSach
                     WHERE ct.MaPhieu = @MaPhieu";
 
                 using (SqlCommand cmd = new SqlCommand(query, conn))
                 {
-                    cmd.Parameters.AddWithValue("@MaPhieu", maPhieu);
+                    cmd.Parameters.Add("@MaPhieu", SqlDbType.VarChar, 10).Value = maPhieu;
                     using (SqlDataReader reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
@@ -205,17 +243,16 @@ namespace QuanLyThuVien.DAL
                             ChiTietPhieuMuonDTO ct = new ChiTietPhieuMuonDTO();
                             ct.MaPhieu = reader["MaPhieu"].ToString();
                             ct.MaSach = reader["MaSach"].ToString();
-
-                            // Đòi hỏi bạn phải thêm public string TenSach { get; set; } vào ChiTietPhieuMuonDTO.cs
-                            ct.TenSach = reader["TenSach"].ToString();
-
+                            ct.TenSach = reader["TenSach"] == DBNull.Value ? null : reader["TenSach"].ToString();
                             ct.SoLuongMuon = Convert.ToInt32(reader["SoLuongMuon"]);
                             ct.TrangThai = reader["TrangThai"].ToString();
 
                             if (reader["NgayTra"] != DBNull.Value)
-                            {
                                 ct.NgayTra = Convert.ToDateTime(reader["NgayTra"]);
-                            }
+                            if (reader["TienPhat"] != DBNull.Value)
+                                ct.TienPhat = Convert.ToDecimal(reader["TienPhat"]);
+                            if (reader["TinhTrangKhiTra"] != DBNull.Value)
+                                ct.TinhTrangKhiTra = reader["TinhTrangKhiTra"].ToString();
 
                             list.Add(ct);
                         }
@@ -224,6 +261,7 @@ namespace QuanLyThuVien.DAL
             }
             return list;
         }
+
         // ==========================================
         // 5. ĐẾM SỐ SÁCH ĐỘC GIẢ ĐANG MƯỢN (chưa trả)
         // ==========================================
@@ -234,14 +272,18 @@ namespace QuanLyThuVien.DAL
                 using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
                 {
                     conn.Open();
+                    // SỬA: thêm JOIN DocGia để lọc IsDeleted = 0
                     string query = @"
                         SELECT ISNULL(SUM(ct.SoLuongMuon), 0)
                         FROM ChiTietPhieuMuon ct
                         JOIN PhieuMuon pm ON ct.MaPhieu = pm.MaPhieu
-                        WHERE pm.MaDocGia = @MaDocGia AND ct.TrangThai = N'Đang mượn'";
+                        JOIN DocGia    dg ON pm.MaDocGia = dg.MaDocGia
+                        WHERE pm.MaDocGia = @MaDocGia
+                          AND ct.TrangThai = N'Đang mượn'
+                          AND dg.IsDeleted = 0";
                     using (SqlCommand cmd = new SqlCommand(query, conn))
                     {
-                        cmd.Parameters.AddWithValue("@MaDocGia", maDocGia);
+                        cmd.Parameters.Add("@MaDocGia", SqlDbType.VarChar, 10).Value = maDocGia;
                         return Convert.ToInt32(cmd.ExecuteScalar());
                     }
                 }

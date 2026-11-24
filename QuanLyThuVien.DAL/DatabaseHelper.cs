@@ -1,7 +1,17 @@
-﻿namespace QuanLyThuVien.DAL
+﻿using System.Data.SqlClient;
+
+namespace QuanLyThuVien.DAL
 {
-    public static class DatabaseHelper
+    public class DatabaseHelper
     {
-        public static string ConnectionString = @"Server=.\SQLEXPRESS;Database=QuanLyThuVien;Trusted_Connection=True;TrustServerCertificate=True;";
+        // Tên DB chuẩn theo file SQL bạn đã gửi là QuanLyThuVienDB
+        public static string ConnectionString =
+            @"Server=.\SQLEXPRESS;Database=QuanLyThuVienDB;Trusted_Connection=True;TrustServerCertificate=True;";
+
+        // Thêm hàm này để DAL có thể gọi
+        public static SqlConnection GetConnection()
+        {
+            return new SqlConnection(ConnectionString);
+        }
     }
 }
