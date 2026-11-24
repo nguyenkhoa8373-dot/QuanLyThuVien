@@ -294,5 +294,30 @@ namespace QuanLyThuVien.DAL
                 return 0;
             }
         }
+        // 6. ĐẾM SỐ LƯỢNG ĐANG MƯỢN CỦA 1 CUỐN SÁCH (Dùng cho SachBLL)
+        public int DemSoLuongDangMuonCuaSach(string maSach)
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
+                {
+                    conn.Open();
+                    string query = @"
+                        SELECT ISNULL(SUM(SoLuongMuon), 0)
+                        FROM ChiTietPhieuMuon
+                        WHERE MaSach = @MaSach AND TrangThai = N'Đang mượn'";
+                    using (SqlCommand cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.Add("@MaSach", SqlDbType.VarChar, 10).Value = maSach;
+                        return Convert.ToInt32(cmd.ExecuteScalar());
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Lỗi đếm sách đang mượn theo sách: " + ex.Message);
+                return 0;
+            }
+        }
     }
 }

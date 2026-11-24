@@ -13,7 +13,6 @@ namespace QuanLyThuVien.DAL
             List<SachDTO> danhSach = new List<SachDTO>();
             try
             {
-                // Gọi DatabaseHelper.ConnectionString thay vì biến cục bộ
                 using (SqlConnection conn = new SqlConnection(DatabaseHelper.ConnectionString))
                 {
                     conn.Open();
@@ -27,8 +26,11 @@ namespace QuanLyThuVien.DAL
                                 SachDTO sach = new SachDTO();
                                 sach.MaSach = reader["MaSach"].ToString();
                                 sach.TenSach = reader["TenSach"].ToString();
-                                sach.TheLoai = reader["TheLoai"].ToString();
-                                sach.SoLuongTon = Convert.ToInt32(reader["SoLuongTon"]);
+
+                                // ĐÃ SỬA LỖI 3: Kiểm tra DBNull cho TheLoai và SoLuongTon
+                                sach.TheLoai = reader["TheLoai"] == DBNull.Value ? null : reader["TheLoai"].ToString();
+                                sach.SoLuongTon = reader["SoLuongTon"] == DBNull.Value ? (int?)null : Convert.ToInt32(reader["SoLuongTon"]);
+
                                 danhSach.Add(sach);
                             }
                         }
@@ -37,7 +39,6 @@ namespace QuanLyThuVien.DAL
             }
             catch (Exception ex)
             {
-                // Lỗi SQL (sai tên cột, sập server...) sẽ nhảy vào đây, phần mềm không bị văng
                 Console.WriteLine("Lỗi hệ thống khi lấy danh sách sách: " + ex.Message);
             }
             return danhSach;
@@ -56,8 +57,9 @@ namespace QuanLyThuVien.DAL
                     {
                         cmd.Parameters.AddWithValue("@MaSach", sach.MaSach);
                         cmd.Parameters.AddWithValue("@TenSach", sach.TenSach);
-                        cmd.Parameters.AddWithValue("@TheLoai", sach.TheLoai);
-                        cmd.Parameters.AddWithValue("@SoLuongTon", sach.SoLuongTon);
+                        // ĐÃ SỬA: Xử lý truyền null xuống SQL an toàn
+                        cmd.Parameters.AddWithValue("@TheLoai", (object?)sach.TheLoai ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@SoLuongTon", (object?)sach.SoLuongTon ?? DBNull.Value);
                         return cmd.ExecuteNonQuery() > 0;
                     }
                 }
@@ -65,7 +67,7 @@ namespace QuanLyThuVien.DAL
             catch (Exception ex)
             {
                 Console.WriteLine("Lỗi khi thêm sách: " + ex.Message);
-                return false; // Báo cho tầng BLL biết là việc thêm đã thất bại
+                return false;
             }
         }
 
@@ -82,8 +84,9 @@ namespace QuanLyThuVien.DAL
                     {
                         cmd.Parameters.AddWithValue("@MaSach", sach.MaSach);
                         cmd.Parameters.AddWithValue("@TenSach", sach.TenSach);
-                        cmd.Parameters.AddWithValue("@TheLoai", sach.TheLoai);
-                        cmd.Parameters.AddWithValue("@SoLuongTon", sach.SoLuongTon);
+                        // ĐÃ SỬA: Xử lý truyền null xuống SQL an toàn
+                        cmd.Parameters.AddWithValue("@TheLoai", (object?)sach.TheLoai ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@SoLuongTon", (object?)sach.SoLuongTon ?? DBNull.Value);
                         return cmd.ExecuteNonQuery() > 0;
                     }
                 }

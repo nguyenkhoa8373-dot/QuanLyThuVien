@@ -26,8 +26,11 @@ namespace QuanLyThuVien.DAL
                                 DocGiaDTO dg = new DocGiaDTO();
                                 dg.MaDocGia = reader["MaDocGia"].ToString();
                                 dg.TenDocGia = reader["TenDocGia"].ToString();
-                                dg.SoDienThoai = reader["SoDienThoai"].ToString();
-                                dg.DiaChi = reader["DiaChi"].ToString();
+
+                                // ĐÃ SỬA LỖI 2: Kiểm tra DBNull cho các cột cho phép NULL
+                                dg.SoDienThoai = reader["SoDienThoai"] == DBNull.Value ? null : reader["SoDienThoai"].ToString();
+                                dg.DiaChi = reader["DiaChi"] == DBNull.Value ? null : reader["DiaChi"].ToString();
+
                                 danhSach.Add(dg);
                             }
                         }
@@ -54,8 +57,9 @@ namespace QuanLyThuVien.DAL
                     {
                         cmd.Parameters.AddWithValue("@MaDocGia", dg.MaDocGia);
                         cmd.Parameters.AddWithValue("@TenDocGia", dg.TenDocGia);
-                        cmd.Parameters.AddWithValue("@SoDienThoai", dg.SoDienThoai);
-                        cmd.Parameters.AddWithValue("@DiaChi", dg.DiaChi);
+                        // Xử lý truyền giá trị null xuống SQL an toàn
+                        cmd.Parameters.AddWithValue("@SoDienThoai", (object?)dg.SoDienThoai ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@DiaChi", (object?)dg.DiaChi ?? DBNull.Value);
                         return cmd.ExecuteNonQuery() > 0;
                     }
                 }
@@ -80,8 +84,9 @@ namespace QuanLyThuVien.DAL
                     {
                         cmd.Parameters.AddWithValue("@MaDocGia", dg.MaDocGia);
                         cmd.Parameters.AddWithValue("@TenDocGia", dg.TenDocGia);
-                        cmd.Parameters.AddWithValue("@SoDienThoai", dg.SoDienThoai);
-                        cmd.Parameters.AddWithValue("@DiaChi", dg.DiaChi);
+                        // Xử lý truyền giá trị null xuống SQL an toàn
+                        cmd.Parameters.AddWithValue("@SoDienThoai", (object?)dg.SoDienThoai ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@DiaChi", (object?)dg.DiaChi ?? DBNull.Value);
                         return cmd.ExecuteNonQuery() > 0;
                     }
                 }
@@ -136,8 +141,11 @@ namespace QuanLyThuVien.DAL
                                 DocGiaDTO dg = new DocGiaDTO();
                                 dg.MaDocGia = reader["MaDocGia"].ToString();
                                 dg.TenDocGia = reader["TenDocGia"].ToString();
-                                dg.SoDienThoai = reader["SoDienThoai"].ToString();
-                                dg.DiaChi = reader["DiaChi"].ToString();
+
+                                // ĐÃ SỬA LỖI 2: Kiểm tra DBNull cho các cột cho phép NULL
+                                dg.SoDienThoai = reader["SoDienThoai"] == DBNull.Value ? null : reader["SoDienThoai"].ToString();
+                                dg.DiaChi = reader["DiaChi"] == DBNull.Value ? null : reader["DiaChi"].ToString();
+
                                 danhSach.Add(dg);
                             }
                         }

@@ -1,5 +1,4 @@
-﻿using System.Data.SqlClient;
-using QuanLyThuVien.DTO;
+﻿using QuanLyThuVien.DTO;
 using System;
 using System.Collections.Generic;
 using System.Data;
