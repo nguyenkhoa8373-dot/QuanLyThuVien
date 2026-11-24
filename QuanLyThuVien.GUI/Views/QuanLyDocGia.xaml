@@ -4,6 +4,7 @@
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="25">
+
             <TextBlock Text="QUẢN LÝ ĐỘC GIẢ"
                        FontSize="26" FontWeight="Bold"
                        Foreground="#172B4D"/>
@@ -11,82 +12,128 @@
             <TextBlock Text="Quản lý thông tin thành viên thư viện"
                        Foreground="#718096" Margin="0,8,0,20"/>
 
-            <Border Background="White" CornerRadius="10" Padding="20" Margin="0,0,0,20">
+            <Border Background="White" CornerRadius="10"
+                    Padding="20" Margin="0,0,0,20">
                 <StackPanel>
+
                     <TextBlock Text="THÔNG TIN ĐỘC GIẢ"
                                FontSize="18" FontWeight="Bold"
                                Foreground="#172B4D" Margin="0,0,0,15"/>
 
                     <UniformGrid Columns="2">
+
+                        <StackPanel Margin="5">
+                            <TextBlock Text="Mã độc giả"/>
+                            <TextBox x:Name="txtMaDocGia"
+                                     Height="32" Margin="0,5,10,10"/>
+                        </StackPanel>
+
                         <StackPanel Margin="5">
                             <TextBlock Text="Họ và tên"/>
-                            <TextBox x:Name="txtHoTen" Height="32" Margin="0,5,10,10"/>
+                            <TextBox x:Name="txtHoTen"
+                                     Height="32" Margin="0,5,10,10"/>
                         </StackPanel>
-                        <StackPanel Margin="5">
-                            <TextBlock Text="Ngày sinh (dd/MM/yyyy)"/>
-                            <TextBox x:Name="txtNgaySinh" Height="32" Margin="0,5,10,10"/>
-                        </StackPanel>
-                        <StackPanel Margin="5">
-                            <TextBlock Text="Giới tính"/>
-                            <ComboBox x:Name="cbGioiTinh" Height="32" Margin="0,5,10,10"
-                                      SelectedIndex="0">
-                                <ComboBoxItem Content="Nam"/>
-                                <ComboBoxItem Content="Nữ"/>
-                                <ComboBoxItem Content="Khác"/>
-                            </ComboBox>
-                        </StackPanel>
+
                         <StackPanel Margin="5">
                             <TextBlock Text="Số điện thoại"/>
-                            <TextBox x:Name="txtSoDienThoai" Height="32" Margin="0,5,10,10"/>
+                            <TextBox x:Name="txtSoDienThoai"
+                                     Height="32" Margin="0,5,10,10"/>
                         </StackPanel>
+
+                        <StackPanel Margin="5">
+                            <TextBlock Text="Địa chỉ"/>
+                            <TextBox x:Name="txtDiaChi"
+                                     Height="32" Margin="0,5,10,10"/>
+                        </StackPanel>
+
                     </UniformGrid>
 
                     <WrapPanel Margin="5,10,0,0">
-                        <Button Content="Thêm độc giả" Width="120" Height="35"
-                                Margin="0,0,10,5" Click="ThemDocGia_Click"/>
-                        <Button Content="Sửa thông tin" Width="120" Height="35"
-                                Margin="0,0,10,5" Click="SuaDocGia_Click"/>
-                        <Button Content="Xóa độc giả" Width="120" Height="35"
-                                Margin="0,0,10,5" Click="XoaDocGia_Click"/>
-                        <Button Content="Nhập lại" Width="100" Height="35"
-                                Margin="0,0,10,5" Click="NhapLai_Click"/>
+
+                        <Button Content="Thêm độc giả"
+                                Width="120" Height="35"
+                                Margin="0,0,10,5"
+                                Click="ThemDocGia_Click"/>
+
+                        <Button Content="Sửa thông tin"
+                                Width="120" Height="35"
+                                Margin="0,0,10,5"
+                                Click="SuaDocGia_Click"/>
+
+                        <Button Content="Xóa độc giả"
+                                Width="120" Height="35"
+                                Margin="0,0,10,5"
+                                Click="XoaDocGia_Click"/>
+
+                        <Button Content="Nhập lại"
+                                Width="100" Height="35"
+                                Margin="0,0,10,5"
+                                Click="NhapLai_Click"/>
+
                     </WrapPanel>
 
-                    <TextBlock x:Name="txtThongBaoDG" Foreground="#16A34A"
+                    <TextBlock x:Name="txtThongBaoDG"
+                               Foreground="#16A34A"
                                Margin="5,10,0,0"/>
+
                 </StackPanel>
             </Border>
 
             <Border Background="White" CornerRadius="10" Padding="20">
                 <StackPanel>
+
                     <TextBlock Text="DANH SÁCH ĐỘC GIẢ"
                                FontSize="18" FontWeight="Bold"
                                Foreground="#172B4D" Margin="0,0,0,15"/>
 
                     <WrapPanel Margin="0,0,0,15">
-                        <TextBox x:Name="txtTimKiemDG" Width="250" Height="32"
+
+                        <TextBox x:Name="txtTimKiemDG"
+                                 Width="250" Height="32"
                                  VerticalContentAlignment="Center"
                                  Margin="0,0,10,5"/>
-                        <Button Content="Tìm kiếm" Width="100" Height="32"
-                                Margin="0,0,10,5" Click="TimKiemDG_Click"/>
-                        <Button Content="Hiển thị tất cả" Width="120" Height="32"
-                                Margin="0,0,10,5" Click="HienTatCaDG_Click"/>
+
+                        <Button Content="Tìm kiếm"
+                                Width="100" Height="32"
+                                Margin="0,0,10,5"
+                                Click="TimKiemDG_Click"/>
+
+                        <Button Content="Hiển thị tất cả"
+                                Width="120" Height="32"
+                                Margin="0,0,10,5"
+                                Click="HienTatCaDG_Click"/>
+
                     </WrapPanel>
 
-                    <DataGrid x:Name="dgDocGia" AutoGenerateColumns="False"
-                              IsReadOnly="True" CanUserAddRows="False"
-                              SelectionMode="Single" Height="280"
+                    <DataGrid x:Name="dgDocGia"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              CanUserAddRows="False"
+                              SelectionMode="Single"
+                              Height="280"
                               SelectionChanged="dgDocGia_SelectionChanged">
+
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Mã độc giả" Binding="{Binding MaDocGia}" Width="*"/>
-                            <DataGridTextColumn Header="Họ và tên" Binding="{Binding HoTen}" Width="2*"/>
-                            <DataGridTextColumn Header="Ngày sinh" Binding="{Binding NgaySinh}" Width="*"/>
-                            <DataGridTextColumn Header="Giới tính" Binding="{Binding GioiTinh}" Width="*"/>
-                            <DataGridTextColumn Header="Số điện thoại" Binding="{Binding SoDienThoai}" Width="*"/>
+
+                            <DataGridTextColumn Header="Mã độc giả"
+                                Binding="{Binding MaDocGia}" Width="*"/>
+
+                            <DataGridTextColumn Header="Họ và tên"
+                                Binding="{Binding TenDocGia}" Width="2*"/>
+
+                            <DataGridTextColumn Header="Số điện thoại"
+                                Binding="{Binding SoDienThoai}" Width="*"/>
+
+                            <DataGridTextColumn Header="Địa chỉ"
+                                Binding="{Binding DiaChi}" Width="2*"/>
+
                         </DataGrid.Columns>
+
                     </DataGrid>
+
                 </StackPanel>
             </Border>
+
         </StackPanel>
     </ScrollViewer>
 </UserControl>
