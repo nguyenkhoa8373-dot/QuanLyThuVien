@@ -7,6 +7,7 @@ namespace QuanLyThuVien.BLL
     public class DocGiaBLL
     {
         private const string LoiCSDL = "Lỗi truy cập cơ sở dữ liệu: ";
+        private const int DoDaiMaToiDa = 10;
 
         // Số điện thoại VN: 10 chữ số, bắt đầu bằng 0
         private static readonly Regex MauSoDienThoai = new Regex(@"^0\d{9}$");
@@ -70,16 +71,22 @@ namespace QuanLyThuVien.BLL
 
             try
             {
-                if (LayTheoMa(docGia.MaDocGia) != null)
+                var danhSach = docGiaDAL.LayDanhSachDocGia();
+
+                if (danhSach.Any(d => string.Equals((d.MaDocGia ?? string.Empty).Trim(), docGia.MaDocGia, StringComparison.OrdinalIgnoreCase)))
                 {
                     thongBao = "Mã độc giả đã tồn tại.";
                     return false;
                 }
 
+                if (danhSach.Any(d => string.Equals((d.SoDienThoai ?? string.Empty).Trim(), docGia.SoDienThoai, StringComparison.OrdinalIgnoreCase)))
+                {
+                    thongBao = "Số điện thoại này đã được đăng ký cho độc giả khác.";
+                    return false;
+                }
+
                 bool ketQua = docGiaDAL.ThemDocGia(docGia);
 
-                // DAL không ném lỗi mà chỉ trả false, nên không phân biệt được nguyên nhân.
-                // Trường hợp hay gặp: mã này từng thuộc một độc giả đã bị xóa (xóa mềm) nên vẫn chiếm khóa chính.
                 thongBao = ketQua
                     ? "Thêm độc giả thành công."
                     : "Không thể thêm độc giả. Mã có thể đã từng được sử dụng (độc giả đã xóa) hoặc lỗi kết nối CSDL.";
@@ -101,9 +108,21 @@ namespace QuanLyThuVien.BLL
 
             try
             {
-                if (LayTheoMa(docGia.MaDocGia) == null)
+                var danhSach = docGiaDAL.LayDanhSachDocGia();
+
+                if (!danhSach.Any(d => string.Equals((d.MaDocGia ?? string.Empty).Trim(), docGia.MaDocGia, StringComparison.OrdinalIgnoreCase)))
                 {
                     thongBao = "Không tìm thấy mã độc giả cần sửa.";
+                    return false;
+                }
+
+                bool trungSdt = danhSach.Any(d =>
+                    !string.Equals((d.MaDocGia ?? string.Empty).Trim(), docGia.MaDocGia, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals((d.SoDienThoai ?? string.Empty).Trim(), docGia.SoDienThoai, StringComparison.OrdinalIgnoreCase));
+
+                if (trungSdt)
+                {
+                    thongBao = "Số điện thoại này đã thuộc về một độc giả khác.";
                     return false;
                 }
 
@@ -154,8 +173,6 @@ namespace QuanLyThuVien.BLL
             }
         }
 
-        // ================= HÀM PHỤ =================
-
         private bool KiemTraDocGia(DocGiaDTO docGia, out string thongBao)
         {
             if (docGia == null)
@@ -167,12 +184,17 @@ namespace QuanLyThuVien.BLL
             docGia.MaDocGia = (docGia.MaDocGia ?? string.Empty).Trim();
             docGia.TenDocGia = (docGia.TenDocGia ?? string.Empty).Trim();
             docGia.SoDienThoai = (docGia.SoDienThoai ?? string.Empty).Trim();
-            // DiaChi null sẽ làm AddWithValue lỗi ở DAL, nên luôn chuẩn hóa về chuỗi rỗng
             docGia.DiaChi = (docGia.DiaChi ?? string.Empty).Trim();
 
             if (docGia.MaDocGia.Length == 0)
             {
                 thongBao = "Mã độc giả không được để trống.";
+                return false;
+            }
+
+            if (docGia.MaDocGia.Length > DoDaiMaToiDa)
+            {
+                thongBao = $"Mã độc giả không được vượt quá {DoDaiMaToiDa} ký tự.";
                 return false;
             }
 

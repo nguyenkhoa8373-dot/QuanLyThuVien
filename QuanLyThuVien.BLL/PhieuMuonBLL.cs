@@ -7,13 +7,11 @@ namespace QuanLyThuVien.BLL
     public class PhieuMuonBLL
     {
         private const string LoiCSDL = "Lỗi truy cập cơ sở dữ liệu: ";
+        private const int DoDaiMaToiDa = 10;
 
-        // Quy định mượn trả - chỉnh tại đây
+        // Quy định mượn trả
         public const int SoNgayMuonToiDa = 30;
-        public const int SoSachToiDaMoiPhieu = 5;
-
-        // LƯU Ý: PhieuMuonDAL.TraSach đang tự tính phạt bằng SQL với đơn giá 5000đ/ngày/dòng chi tiết.
-        // Hằng số này chỉ dùng để HIỂN THỊ số tiền phạt trong thông báo, phải giữ khớp với DAL.
+        public const int SoSachToiDaMoiDocGia = 5;
         public const decimal TienPhatMoiNgay = 5000m;
 
         private readonly PhieuMuonDAL phieuMuonDAL;
@@ -35,15 +33,7 @@ namespace QuanLyThuVien.BLL
 
         public List<PhieuMuonDTO> LayDanhSachPhieuMuon()
         {
-            try
-            {
-                return phieuMuonDAL.LayDanhSachPhieuMuon();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Lỗi lấy danh sách phiếu mượn: " + ex.Message);
-                return new List<PhieuMuonDTO>();
-            }
+            return phieuMuonDAL.LayDanhSachPhieuMuon();
         }
 
         public List<ChiTietPhieuMuonDTO> LayChiTietCuaPhieu(string maPhieu)
@@ -53,15 +43,7 @@ namespace QuanLyThuVien.BLL
                 return new List<ChiTietPhieuMuonDTO>();
             }
 
-            try
-            {
-                return phieuMuonDAL.LayChiTietCuaPhieu(maPhieu.Trim());
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Lỗi lấy chi tiết phiếu mượn: " + ex.Message);
-                return new List<ChiTietPhieuMuonDTO>();
-            }
+            return phieuMuonDAL.LayChiTietCuaPhieu(maPhieu.Trim());
         }
 
         /// <summary>Trạng thái tổng của phiếu: "Đang mượn", "Quá hạn" hoặc "Đã trả".</summary>
@@ -75,15 +57,13 @@ namespace QuanLyThuVien.BLL
                 return TruyVanMuon.DaTra;
             }
 
-            return phieu.HanTra.Date < DateTime.Today ? "Quá hạn" : TruyVanMuon.DangMuon;
+            return (phieu.HanTra.HasValue && phieu.HanTra.Value.Date < DateTime.Today)
+                ? "Quá hạn"
+                : TruyVanMuon.DangMuon;
         }
 
         // ================= MƯỢN SÁCH =================
 
-        /// <summary>
-        /// Tạo phiếu mượn. Nếu phieu.MaPhieu để trống thì tự sinh (PM001, PM002...).
-        /// Nếu NgayMuon chưa gán thì lấy thời điểm hiện tại.
-        /// </summary>
         public bool TaoPhieuMuon(PhieuMuonDTO phieu, List<ChiTietPhieuMuonDTO> danhSachChiTiet, out string thongBao)
         {
             if (!KiemTraPhieu(phieu, danhSachChiTiet, out thongBao))
@@ -93,9 +73,9 @@ namespace QuanLyThuVien.BLL
 
             try
             {
-                // 1. Độc giả phải tồn tại (và chưa bị xóa - DAL đã lọc IsDeleted = 0)
+                // 1. Độc giả phải tồn tại (và chưa bị xóa)
                 bool docGiaTonTai = docGiaDAL.LayDanhSachDocGia()
-                    .Any(d => string.Equals((d.MaDocGia ?? string.Empty).Trim(), phieu.MaDG, StringComparison.OrdinalIgnoreCase));
+                    .Any(d => string.Equals((d.MaDocGia ?? string.Empty).Trim(), phieu.MaDocGia, StringComparison.OrdinalIgnoreCase));
 
                 if (!docGiaTonTai)
                 {
@@ -117,16 +97,17 @@ namespace QuanLyThuVien.BLL
                         return false;
                     }
 
-                    if (sach.SoLuongTon < ct.SoLuongMuon)
+                    int tonKho = sach.SoLuongTon ?? 0;
+                    if (tonKho < ct.SoLuongMuon)
                     {
-                        thongBao = $"Sách \"{sach.TenSach}\" chỉ còn {sach.SoLuongTon} cuốn, không đủ để mượn {ct.SoLuongMuon} cuốn.";
+                        thongBao = $"Sách \"{sach.TenSach}\" chỉ còn {tonKho} cuốn, không đủ để mượn {ct.SoLuongMuon} cuốn.";
                         return false;
                     }
                 }
 
                 // 3. Độc giả đang có sách quá hạn thì không được mượn thêm
-                var quaHan = TruyVanMuon.LayChiTietDangMuon(phieuMuonDAL, phieu.MaDG)
-                    .FirstOrDefault(x => x.Phieu.HanTra.Date < DateTime.Today);
+                var quaHan = TruyVanMuon.LayChiTietDangMuon(phieuMuonDAL, phieu.MaDocGia)
+                    .FirstOrDefault(x => x.Phieu.HanTra.HasValue && x.Phieu.HanTra.Value.Date < DateTime.Today);
 
                 if (quaHan.Phieu != null)
                 {
@@ -134,7 +115,17 @@ namespace QuanLyThuVien.BLL
                     return false;
                 }
 
-                // 4. Mã phiếu
+                // 4. Tổng số sách đang mượn + sách mới không vượt quá hạn mức
+                int dangMuon = TruyVanMuon.DemSachDangMuonCuaDocGia(phieuMuonDAL, phieu.MaDocGia!);
+                int muonMoi = danhSachChiTiet.Sum(x => x.SoLuongMuon);
+
+                if (dangMuon + muonMoi > SoSachToiDaMoiDocGia)
+                {
+                    thongBao = $"Độc giả đang mượn {dangMuon} cuốn. Chỉ được mượn tối đa {SoSachToiDaMoiDocGia} cuốn cùng lúc (hiện chọn thêm {muonMoi} cuốn).";
+                    return false;
+                }
+
+                // 5. Mã phiếu
                 var dsPhieu = phieuMuonDAL.LayDanhSachPhieuMuon();
 
                 if (string.IsNullOrEmpty(phieu.MaPhieu))
@@ -147,7 +138,9 @@ namespace QuanLyThuVien.BLL
                     return false;
                 }
 
-                // 5. Lưu (DAL dùng transaction: tạo phiếu + chi tiết + trừ kho)
+                phieu.TrangThai = TruyVanMuon.DangMuon;
+
+                // 6. Lưu (DAL dùng transaction: tạo phiếu + chi tiết + trừ kho)
                 bool ketQua = phieuMuonDAL.TaoPhieuMuon(phieu, danhSachChiTiet);
                 thongBao = ketQua
                     ? $"Tạo phiếu mượn {phieu.MaPhieu} thành công."
@@ -163,7 +156,6 @@ namespace QuanLyThuVien.BLL
 
         // ================= TRẢ SÁCH =================
 
-        /// <summary>Trả toàn bộ sách còn đang mượn của phiếu.</summary>
         public bool TraSach(string maPhieu, out string thongBao)
         {
             if (string.IsNullOrWhiteSpace(maPhieu))
@@ -185,9 +177,13 @@ namespace QuanLyThuVien.BLL
                     return false;
                 }
 
-                int soDongChuaTra = phieuMuonDAL.LayChiTietCuaPhieu(phieu.MaPhieu).Count(TruyVanMuon.LaDangMuon);
+                var chiTietTruocTra = phieuMuonDAL.LayChiTietCuaPhieu(phieu.MaPhieu);
+                var maSachChuaTra = chiTietTruocTra
+                    .Where(TruyVanMuon.LaDangMuon)
+                    .Select(x => x.MaSach)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-                if (soDongChuaTra == 0)
+                if (maSachChuaTra.Count == 0)
                 {
                     thongBao = "Phiếu này đã trả hết sách.";
                     return false;
@@ -201,12 +197,19 @@ namespace QuanLyThuVien.BLL
                     return false;
                 }
 
-                int soNgayTre = Math.Max(0, (DateTime.Today - phieu.HanTra.Date).Days);
+                // Đọc lại tiền phạt thực tế đã được SQL Server tính và lưu
+                var chiTietSauTra = phieuMuonDAL.LayChiTietCuaPhieu(phieu.MaPhieu);
+                decimal tongTienPhat = chiTietSauTra
+                    .Where(ct => maSachChuaTra.Contains(ct.MaSach))
+                    .Sum(ct => ct.TienPhat ?? 0m);
 
-                if (soNgayTre > 0)
+                int soNgayTre = phieu.HanTra.HasValue
+                    ? Math.Max(0, (DateTime.Today - phieu.HanTra.Value.Date).Days)
+                    : 0;
+
+                if (tongTienPhat > 0 || soNgayTre > 0)
                 {
-                    decimal tienPhat = soNgayTre * TienPhatMoiNgay * soDongChuaTra;
-                    thongBao = $"Trả sách thành công. Trễ {soNgayTre} ngày, tiền phạt: {tienPhat:N0}đ.";
+                    thongBao = $"Trả sách thành công. Trễ {soNgayTre} ngày, tiền phạt: {tongTienPhat:N0}đ.";
                 }
                 else
                 {
@@ -233,26 +236,38 @@ namespace QuanLyThuVien.BLL
             }
 
             phieu.MaPhieu = (phieu.MaPhieu ?? string.Empty).Trim();
-            phieu.MaDG = (phieu.MaDG ?? string.Empty).Trim();
+            phieu.MaDocGia = (phieu.MaDocGia ?? string.Empty).Trim();
 
-            if (phieu.MaDG.Length == 0)
+            if (phieu.MaPhieu.Length > DoDaiMaToiDa)
+            {
+                thongBao = $"Mã phiếu mượn không được vượt quá {DoDaiMaToiDa} ký tự.";
+                return false;
+            }
+
+            if (phieu.MaDocGia.Length == 0)
             {
                 thongBao = "Vui lòng chọn độc giả.";
                 return false;
             }
 
-            if (phieu.NgayMuon == default)
+            if (!phieu.NgayMuon.HasValue || phieu.NgayMuon.Value == default)
             {
                 phieu.NgayMuon = DateTime.Now;
             }
 
-            if (phieu.HanTra.Date <= phieu.NgayMuon.Date)
+            if (!phieu.HanTra.HasValue)
+            {
+                thongBao = "Vui lòng chọn hạn trả.";
+                return false;
+            }
+
+            if (phieu.HanTra.Value.Date <= phieu.NgayMuon.Value.Date)
             {
                 thongBao = "Hạn trả phải sau ngày mượn.";
                 return false;
             }
 
-            if ((phieu.HanTra.Date - phieu.NgayMuon.Date).Days > SoNgayMuonToiDa)
+            if ((phieu.HanTra.Value.Date - phieu.NgayMuon.Value.Date).Days > SoNgayMuonToiDa)
             {
                 thongBao = $"Thời hạn mượn tối đa là {SoNgayMuonToiDa} ngày.";
                 return false;
@@ -298,9 +313,9 @@ namespace QuanLyThuVien.BLL
                 tongSoCuon += ct.SoLuongMuon;
             }
 
-            if (tongSoCuon > SoSachToiDaMoiPhieu)
+            if (tongSoCuon > SoSachToiDaMoiDocGia)
             {
-                thongBao = $"Mỗi phiếu chỉ được mượn tối đa {SoSachToiDaMoiPhieu} cuốn (hiện đang chọn {tongSoCuon}).";
+                thongBao = $"Mỗi lần chỉ được mượn tối đa {SoSachToiDaMoiDocGia} cuốn (hiện đang chọn {tongSoCuon}).";
                 return false;
             }
 
@@ -308,7 +323,6 @@ namespace QuanLyThuVien.BLL
             return true;
         }
 
-        // Sinh mã dạng PM001, PM002... dựa trên số lớn nhất đang có
         private static string SinhMaPhieu(List<PhieuMuonDTO> danhSachPhieu)
         {
             int max = 0;

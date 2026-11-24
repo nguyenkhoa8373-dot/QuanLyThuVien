@@ -7,6 +7,7 @@ namespace QuanLyThuVien.BLL
     {
         private const string LoiCSDL = "Lỗi truy cập cơ sở dữ liệu: ";
         private const int SoLuongToiDa = 100000;
+        private const int DoDaiMaToiDa = 10;
 
         private readonly SachDAL sachDAL;
         private readonly PhieuMuonDAL phieuMuonDAL;
@@ -75,7 +76,6 @@ namespace QuanLyThuVien.BLL
 
                 bool ketQua = sachDAL.ThemSach(sach);
 
-                // DAL chỉ trả false, không cho biết nguyên nhân (ví dụ mã của sách đã xóa mềm vẫn chiếm khóa chính)
                 thongBao = ketQua
                     ? "Thêm sách thành công."
                     : "Không thể thêm sách. Mã có thể đã từng được sử dụng (sách đã xóa) hoặc lỗi kết nối CSDL.";
@@ -103,8 +103,6 @@ namespace QuanLyThuVien.BLL
                     return false;
                 }
 
-                // Lưu ý: SoLuongTon là số cuốn CÒN TRONG KHO (đã trừ số đang cho mượn),
-                // nên sửa trực tiếp ở đây là điều chỉnh tồn kho.
                 bool ketQua = sachDAL.SuaSach(sach);
                 thongBao = ketQua ? "Cập nhật sách thành công." : "Không thể cập nhật sách.";
                 return ketQua;
@@ -170,6 +168,12 @@ namespace QuanLyThuVien.BLL
                 return false;
             }
 
+            if (sach.MaSach.Length > DoDaiMaToiDa)
+            {
+                thongBao = $"Mã sách không được vượt quá {DoDaiMaToiDa} ký tự.";
+                return false;
+            }
+
             if (sach.TenSach.Length == 0)
             {
                 thongBao = "Tên sách không được để trống.";
@@ -182,18 +186,20 @@ namespace QuanLyThuVien.BLL
                 return false;
             }
 
-            if (sach.SoLuongTon < 0)
+            int soLuong = sach.SoLuongTon ?? 0;
+            if (soLuong < 0)
             {
                 thongBao = "Số lượng tồn không được nhỏ hơn 0.";
                 return false;
             }
 
-            if (sach.SoLuongTon > SoLuongToiDa)
+            if (soLuong > SoLuongToiDa)
             {
                 thongBao = $"Số lượng tồn không được lớn hơn {SoLuongToiDa}.";
                 return false;
             }
 
+            sach.SoLuongTon = soLuong;
             thongBao = string.Empty;
             return true;
         }
