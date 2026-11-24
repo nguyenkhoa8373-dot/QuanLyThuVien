@@ -10,19 +10,20 @@ namespace QuanLyThuVien.GUI.Views
 {
     public partial class QuanLyDocGia : UserControl
     {
-        // Danh sách độc giả tạm thời
-        // Sau này sẽ thay bằng dữ liệu lấy từ SQL Server
-        private ObservableCollection<DocGiaDTO> danhSachDocGia = new();
+        // Su dung danh sach doc gia dung chung
+        private ObservableCollection<DocGiaDTO> danhSachDocGia;
 
         public QuanLyDocGia()
         {
             InitializeComponent();
 
-            // Hiển thị danh sách khi mở giao diện
+            // Lay du lieu tu kho du lieu chung
+            danhSachDocGia = DuLieuDocGia.DanhSach;
+
             TaiDanhSachDocGia();
         }
 
-        // 1. Hiển thị danh sách độc giả
+        // 1. Hien thi danh sach doc gia
         private void TaiDanhSachDocGia()
         {
             dgDocGia.ItemsSource = null;
@@ -32,7 +33,7 @@ namespace QuanLyThuVien.GUI.Views
                 .ToList();
         }
 
-        // 2. Kiểm tra thông tin nhập
+        // 2. Kiem tra thong tin nhap
         private bool KiemTraForm()
         {
             string maDocGia = txtMaDocGia.Text.Trim();
@@ -54,7 +55,6 @@ namespace QuanLyThuVien.GUI.Views
                 return false;
             }
 
-            // Kiểm tra độ dài theo SQL
             if (maDocGia.Length > 10)
             {
                 MessageBox.Show("Mã độc giả không được quá 10 ký tự!");
@@ -79,8 +79,6 @@ namespace QuanLyThuVien.GUI.Views
                 return false;
             }
 
-            // SQL cho phép số điện thoại NULL.
-            // Nếu có nhập thì chỉ nhận chữ số.
             if (!string.IsNullOrWhiteSpace(soDienThoai) &&
                 !soDienThoai.All(char.IsDigit))
             {
@@ -91,7 +89,7 @@ namespace QuanLyThuVien.GUI.Views
             return true;
         }
 
-        // 3. Thêm độc giả
+        // 3. Them doc gia
         private void ThemDocGia_Click(object sender, RoutedEventArgs e)
         {
             if (!KiemTraForm())
@@ -99,7 +97,7 @@ namespace QuanLyThuVien.GUI.Views
 
             string maDocGia = txtMaDocGia.Text.Trim();
 
-            // Kiểm tra mã độc giả đã tồn tại
+            // Kiem tra trung ma
             bool daTonTai = danhSachDocGia.Any(dg =>
                 dg.MaDocGia.Equals(
                     maDocGia,
@@ -116,12 +114,10 @@ namespace QuanLyThuVien.GUI.Views
                 MaDocGia = maDocGia,
                 TenDocGia = txtHoTen.Text.Trim(),
 
-                // Cho phép bỏ trống số điện thoại
                 SoDienThoai = string.IsNullOrWhiteSpace(txtSoDienThoai.Text)
                     ? null
                     : txtSoDienThoai.Text.Trim(),
 
-                // Cho phép bỏ trống địa chỉ
                 DiaChi = string.IsNullOrWhiteSpace(txtDiaChi.Text)
                     ? null
                     : txtDiaChi.Text.Trim(),
@@ -132,12 +128,13 @@ namespace QuanLyThuVien.GUI.Views
             danhSachDocGia.Add(docGia);
 
             TaiDanhSachDocGia();
+
             NhapLai();
 
             txtThongBaoDG.Text = "Thêm độc giả thành công!";
         }
 
-        // 4. Sửa thông tin độc giả
+        // 4. Sua thong tin doc gia
         private void SuaDocGia_Click(object sender, RoutedEventArgs e)
         {
             if (dgDocGia.SelectedItem is not DocGiaDTO docGia)
@@ -149,7 +146,7 @@ namespace QuanLyThuVien.GUI.Views
             if (!KiemTraForm())
                 return;
 
-            // Không cho thay đổi mã độc giả
+            // Khong cho thay doi ma doc gia
             docGia.TenDocGia = txtHoTen.Text.Trim();
 
             docGia.SoDienThoai =
@@ -163,12 +160,13 @@ namespace QuanLyThuVien.GUI.Views
                 : txtDiaChi.Text.Trim();
 
             TaiDanhSachDocGia();
+
             NhapLai();
 
             txtThongBaoDG.Text = "Cập nhật thông tin thành công!";
         }
 
-        // 5. Xóa độc giả
+        // 5. Xoa doc gia
         private void XoaDocGia_Click(object sender, RoutedEventArgs e)
         {
             if (dgDocGia.SelectedItem is not DocGiaDTO docGia)
@@ -187,17 +185,17 @@ namespace QuanLyThuVien.GUI.Views
             if (ketQua != MessageBoxResult.Yes)
                 return;
 
-            // Đánh dấu xóa tạm thời
-            // Khi kết nối SQL sẽ chuyển thành IsDeleted = 1
+            // Xoa mem
             docGia.IsDeleted = true;
 
             TaiDanhSachDocGia();
+
             NhapLai();
 
             txtThongBaoDG.Text = "Xóa độc giả thành công!";
         }
 
-        // 6. Chọn độc giả trên bảng
+        // 6. Chon doc gia tren bang
         private void dgDocGia_SelectionChanged(
             object sender,
             SelectionChangedEventArgs e)
@@ -209,12 +207,12 @@ namespace QuanLyThuVien.GUI.Views
                 txtSoDienThoai.Text = docGia.SoDienThoai ?? "";
                 txtDiaChi.Text = docGia.DiaChi ?? "";
 
-                // Không cho sửa mã độc giả
+                // Khong cho sua ma doc gia
                 txtMaDocGia.IsReadOnly = true;
             }
         }
 
-        // 7. Tìm kiếm độc giả
+        // 7. Tim kiem doc gia
         private void TimKiemDG_Click(
             object sender,
             RoutedEventArgs e)
@@ -253,7 +251,7 @@ namespace QuanLyThuVien.GUI.Views
                 "Tìm thấy " + ketQua.Count + " độc giả.";
         }
 
-        // 8. Hiển thị tất cả độc giả
+        // 8. Hien thi tat ca doc gia
         private void HienTatCaDG_Click(
             object sender,
             RoutedEventArgs e)
@@ -265,7 +263,7 @@ namespace QuanLyThuVien.GUI.Views
             txtThongBaoDG.Text = "Đã hiển thị tất cả độc giả.";
         }
 
-        // 9. Nhập lại thông tin
+        // 9. Nhap lai thong tin
         private void NhapLai_Click(
             object sender,
             RoutedEventArgs e)
@@ -285,6 +283,46 @@ namespace QuanLyThuVien.GUI.Views
             dgDocGia.SelectedItem = null;
 
             txtThongBaoDG.Text = "";
+        }
+    }
+
+    // Kho du lieu doc gia dung chung
+    public static class DuLieuDocGia
+    {
+        public static ObservableCollection<DocGiaDTO> DanhSach { get; }
+            = KhoiTaoDuLieu();
+
+        private static ObservableCollection<DocGiaDTO> KhoiTaoDuLieu()
+        {
+            return new ObservableCollection<DocGiaDTO>
+            {
+                new DocGiaDTO
+                {
+                    MaDocGia = "DG001",
+                    TenDocGia = "Nguyen Van An",
+                    SoDienThoai = "0987654321",
+                    DiaChi = "Ha Noi",
+                    IsDeleted = false
+                },
+
+                new DocGiaDTO
+                {
+                    MaDocGia = "DG002",
+                    TenDocGia = "Tran Thi Binh",
+                    SoDienThoai = "0912345678",
+                    DiaChi = "Vinh Phuc",
+                    IsDeleted = false
+                },
+
+                new DocGiaDTO
+                {
+                    MaDocGia = "DG003",
+                    TenDocGia = "Le Van Cuong",
+                    SoDienThoai = "0978123456",
+                    DiaChi = "Bac Ninh",
+                    IsDeleted = false
+                }
+            };
         }
     }
 }

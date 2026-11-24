@@ -1,182 +1,227 @@
-﻿using System.Collections.ObjectModel;
+﻿
+using System;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using QuanLyThuVien.DTO;
 
 namespace QuanLyThuVien.GUI.Views
 {
     public partial class QuanLyMuonSach : UserControl
     {
-        private ObservableCollection<SachHienThi> danhSachSach = new();
+        // Dung chung du lieu giua cac lan mo man hinh
+        private readonly ObservableCollection<SachDTO> danhSachSach
+            = DuLieuSach.DanhSach;
 
         public QuanLyMuonSach()
         {
             InitializeComponent();
 
-            // Du lieu mau, se thay bang du lieu SQL sau
-            danhSachSach.Add(new SachHienThi
-            {
-                MaSach = "S001",
-                TenSach = "Lap trinh C#",
-                TheLoai = "Cong nghe",
-                SoLuongTon = 10
-            });
-
-            danhSachSach.Add(new SachHienThi
-            {
-                MaSach = "S002",
-                TenSach = "Lap trinh C++",
-                TheLoai = "Cong nghe",
-                SoLuongTon = 5
-            });
-
-            danhSachSach.Add(new SachHienThi
-            {
-                MaSach = "S003",
-                TenSach = "Dac nhan tam",
-                TheLoai = "Ky nang",
-                SoLuongTon = 8
-            });
-
-            dgSach.ItemsSource = danhSachSach;
+            // Hien thi danh sach sach
+            TaiDanhSachSach();
         }
 
+        // 1. Hien thi danh sach sach
+        private void TaiDanhSachSach()
+        {
+            dgSach.ItemsSource = danhSachSach
+                .Where(s => s.IsDeleted != true)
+                .ToList();
+        }
+
+        // 2. Kiem tra du lieu nhap
         private bool KiemTraForm(out int soLuong)
         {
             soLuong = 0;
 
-            if (string.IsNullOrWhiteSpace(txtMaSach.Text) ||
-                string.IsNullOrWhiteSpace(txtTenSach.Text))
+            string maSach = txtMaSach.Text.Trim();
+            string tenSach = txtTenSach.Text.Trim();
+            string theLoai = txtTheLoai.Text.Trim();
+
+            if (string.IsNullOrWhiteSpace(maSach))
             {
-                MessageBox.Show("Vui lòng nhập mã sách và tên sách!");
+                MessageBox.Show("Vui long nhap ma sach!");
+                txtMaSach.Focus();
                 return false;
             }
 
-            if (txtMaSach.Text.Trim().Length > 10 ||
-                txtTenSach.Text.Trim().Length > 100 ||
-                txtTheLoai.Text.Trim().Length > 50)
+            if (string.IsNullOrWhiteSpace(tenSach))
             {
-                MessageBox.Show("Thông tin nhập vượt quá độ dài cho phép!");
+                MessageBox.Show("Vui long nhap ten sach!");
+                txtTenSach.Focus();
                 return false;
             }
 
-            if (!int.TryParse(txtSoLuong.Text, out soLuong) || soLuong < 0)
+            if (maSach.Length > 10 ||
+                tenSach.Length > 100 ||
+                theLoai.Length > 50)
             {
-                MessageBox.Show("Số lượng tồn phải là số nguyên không âm!");
+                MessageBox.Show("Thong tin vuot qua do dai cho phep!");
+                return false;
+            }
+
+            if (!int.TryParse(txtSoLuong.Text.Trim(), out soLuong)
+                || soLuong < 0)
+            {
+                MessageBox.Show("So luong ton phai la so nguyen khong am!");
+                txtSoLuong.Focus();
+                return false;
+            }
+
+            if (soLuong > 100000)
+            {
+                MessageBox.Show("So luong ton qua lon!");
                 return false;
             }
 
             return true;
         }
 
+        // 3. Them sach
         private void ThemSach_Click(object sender, RoutedEventArgs e)
         {
-            if (!KiemTraForm(out int soLuong)) return;
+            if (!KiemTraForm(out int soLuong))
+                return;
 
             string maSach = txtMaSach.Text.Trim();
 
-            if (danhSachSach.Any(s => s.MaSach == maSach))
+            bool daTonTai = danhSachSach.Any(s =>
+                s.IsDeleted != true &&
+                string.Equals(
+                    s.MaSach,
+                    maSach,
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (daTonTai)
             {
-                MessageBox.Show("Mã sách đã tồn tại!");
+                MessageBox.Show("Ma sach da ton tai!");
                 return;
             }
 
-            danhSachSach.Add(new SachHienThi
+            SachDTO sach = new SachDTO
             {
                 MaSach = maSach,
                 TenSach = txtTenSach.Text.Trim(),
                 TheLoai = txtTheLoai.Text.Trim(),
-                SoLuongTon = soLuong
-            });
+                SoLuongTon = soLuong,
+                IsDeleted = false
+            };
 
+            danhSachSach.Add(sach);
+
+            TaiDanhSachSach();
             NhapLai();
-            txtThongBao.Text = "Thêm sách thành công!";
+
+            txtThongBao.Text = "Them sach thanh cong!";
         }
 
+        // 4. Sua sach
         private void SuaSach_Click(object sender, RoutedEventArgs e)
         {
-            if (dgSach.SelectedItem is not SachHienThi sach)
+            if (dgSach.SelectedItem is not SachDTO sach)
             {
-                MessageBox.Show("Vui lòng chọn sách cần sửa!");
+                MessageBox.Show("Vui long chon sach can sua!");
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(txtTenSach.Text))
-            {
-                MessageBox.Show("Vui lòng nhập tên sách!");
+            if (!KiemTraForm(out int soLuong))
                 return;
-            }
 
-            if (!int.TryParse(txtSoLuong.Text, out int soLuong) || soLuong < 0)
-            {
-                MessageBox.Show("Số lượng tồn phải là số nguyên không âm!");
-                return;
-            }
-
-            if (txtTenSach.Text.Trim().Length > 100 ||
-                txtTheLoai.Text.Trim().Length > 50)
-            {
-                MessageBox.Show("Thông tin nhập vượt quá độ dài cho phép!");
-                return;
-            }
-
+            // Khong cho sua ma sach
             sach.TenSach = txtTenSach.Text.Trim();
             sach.TheLoai = txtTheLoai.Text.Trim();
             sach.SoLuongTon = soLuong;
 
-            dgSach.Items.Refresh();
+            TaiDanhSachSach();
             NhapLai();
-            txtThongBao.Text = "Cập nhật sách thành công!";
+
+            txtThongBao.Text = "Cap nhat sach thanh cong!";
         }
 
+        // 5. Xoa sach
         private void XoaSach_Click(object sender, RoutedEventArgs e)
         {
-            if (dgSach.SelectedItem is not SachHienThi sach)
+            if (dgSach.SelectedItem is not SachDTO sach)
             {
-                MessageBox.Show("Vui lòng chọn sách cần xóa!");
+                MessageBox.Show("Vui long chon sach can xoa!");
                 return;
             }
 
-            if (MessageBox.Show("Bạn có chắc muốn xóa sách này?",
-                "Xác nhận", MessageBoxButton.YesNo,
-                MessageBoxImage.Question) == MessageBoxResult.Yes)
-            {
-                danhSachSach.Remove(sach);
-                NhapLai();
-                txtThongBao.Text = "Xóa sách thành công!";
-            }
+            MessageBoxResult ketQua = MessageBox.Show(
+                "Ban co chac chan muon xoa sach "
+                + sach.TenSach + "?",
+                "Xac nhan xoa",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (ketQua != MessageBoxResult.Yes)
+                return;
+
+            // Danh dau da xoa, chua xoa khoi bo nho
+            sach.IsDeleted = true;
+
+            TaiDanhSachSach();
+            NhapLai();
+
+            txtThongBao.Text = "Xoa sach thanh cong!";
         }
 
-        private void dgSach_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        // 6. Chon sach tren bang
+        private void dgSach_SelectionChanged(
+            object sender,
+            SelectionChangedEventArgs e)
         {
-            if (dgSach.SelectedItem is SachHienThi sach)
+            if (dgSach.SelectedItem is SachDTO sach)
             {
                 txtMaSach.Text = sach.MaSach;
                 txtTenSach.Text = sach.TenSach;
-                txtTheLoai.Text = sach.TheLoai;
-                txtSoLuong.Text = sach.SoLuongTon.ToString();
+                txtTheLoai.Text = sach.TheLoai ?? "";
+                txtSoLuong.Text =
+                    (sach.SoLuongTon ?? 0).ToString();
+
+                // Khong cho sua ma sach
+                txtMaSach.IsReadOnly = true;
             }
         }
 
+        // 7. Tim kiem sach
         private void TimKiem_Click(object sender, RoutedEventArgs e)
         {
             string tuKhoa = txtTimKiem.Text.Trim();
 
-            dgSach.ItemsSource = string.IsNullOrWhiteSpace(tuKhoa)
-                ? danhSachSach
-                : danhSachSach.Where(s =>
-                    s.MaSach.Contains(tuKhoa, System.StringComparison.OrdinalIgnoreCase) ||
-                    s.TenSach.Contains(tuKhoa, System.StringComparison.OrdinalIgnoreCase) ||
-                    s.TheLoai.Contains(tuKhoa, System.StringComparison.OrdinalIgnoreCase))
-                  .ToList();
+            var ketQua = danhSachSach
+                .Where(s => s.IsDeleted != true)
+                .Where(s =>
+                    string.IsNullOrWhiteSpace(tuKhoa) ||
+                    s.MaSach.Contains(
+                        tuKhoa,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    s.TenSach.Contains(
+                        tuKhoa,
+                        StringComparison.OrdinalIgnoreCase) ||
+                    (s.TheLoai ?? "").Contains(
+                        tuKhoa,
+                        StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            dgSach.ItemsSource = ketQua;
+
+            txtThongBao.Text =
+                "Tim thay " + ketQua.Count + " sach.";
         }
 
+        // 8. Hien thi tat ca sach
         private void HienTatCa_Click(object sender, RoutedEventArgs e)
         {
-            dgSach.ItemsSource = danhSachSach;
             txtTimKiem.Clear();
+
+            TaiDanhSachSach();
+
+            txtThongBao.Text = "Da hien thi tat ca sach.";
         }
 
+        // 9. Nhap lai
         private void NhapLai_Click(object sender, RoutedEventArgs e)
         {
             NhapLai();
@@ -188,16 +233,47 @@ namespace QuanLyThuVien.GUI.Views
             txtTenSach.Clear();
             txtTheLoai.Clear();
             txtSoLuong.Clear();
+
+            txtMaSach.IsReadOnly = false;
+
             dgSach.SelectedItem = null;
+
             txtThongBao.Text = "";
         }
     }
 
-    public class SachHienThi
+    // Du lieu sach mau dung chung trong GUI
+    public static class DuLieuSach
     {
-        public string MaSach { get; set; } = "";
-        public string TenSach { get; set; } = "";
-        public string TheLoai { get; set; } = "";
-        public int SoLuongTon { get; set; }
+        public static ObservableCollection<SachDTO> DanhSach
+            = new ObservableCollection<SachDTO>
+        {
+            new SachDTO
+            {
+                MaSach = "S001",
+                TenSach = "Lap trinh C#",
+                TheLoai = "Cong nghe",
+                SoLuongTon = 10,
+                IsDeleted = false
+            },
+
+            new SachDTO
+            {
+                MaSach = "S002",
+                TenSach = "Lap trinh C++",
+                TheLoai = "Cong nghe",
+                SoLuongTon = 5,
+                IsDeleted = false
+            },
+
+            new SachDTO
+            {
+                MaSach = "S003",
+                TenSach = "Dac nhan tam",
+                TheLoai = "Ky nang",
+                SoLuongTon = 8,
+                IsDeleted = false
+            }
+        };
     }
 }
