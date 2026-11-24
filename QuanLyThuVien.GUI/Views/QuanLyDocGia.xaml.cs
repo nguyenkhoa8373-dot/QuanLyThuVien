@@ -1,147 +1,207 @@
 ﻿
-using System.Collections.ObjectModel;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using QuanLyThuVien.BLL;
+using QuanLyThuVien.DTO;
 
 namespace QuanLyThuVien.GUI.Views
 {
     public partial class QuanLyDocGia : UserControl
     {
-        ObservableCollection<DocGiaHienThi> danhSachDocGia = new();
+        // Kết nối tầng nghiệp vụ
+        private readonly DocGiaBLL docGiaBLL = new DocGiaBLL();
+
+        // Danh sách độc giả
+        private List<DocGiaDTO> danhSachDocGia = new();
 
         public QuanLyDocGia()
         {
             InitializeComponent();
 
-            danhSachDocGia.Add(new DocGiaHienThi { MaDocGia = 1, HoTen = "Nguyen Van A", NgaySinh = "10/05/2005", GioiTinh = "Nam", SoDienThoai = "0912345678" });
-            danhSachDocGia.Add(new DocGiaHienThi { MaDocGia = 2, HoTen = "Tran Thi B", NgaySinh = "20/08/2004", GioiTinh = "Nữ", SoDienThoai = "0987654321" });
-            danhSachDocGia.Add(new DocGiaHienThi { MaDocGia = 3, HoTen = "Le Van C", NgaySinh = "15/03/2006", GioiTinh = "Nam", SoDienThoai = "0901234567" });
-
-            dgDocGia.ItemsSource = danhSachDocGia;
+            // Tải dữ liệu khi mở màn hình
+            TaiDanhSachDocGia();
         }
 
+        // 1. Tải danh sách độc giả
+        private void TaiDanhSachDocGia()
+        {
+            try
+            {
+                danhSachDocGia = docGiaBLL.LayDanhSachDocGia();
+                dgDocGia.ItemsSource = danhSachDocGia;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Không thể tải danh sách độc giả: " + ex.Message,
+                    "Lỗi",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        // 2. Thêm độc giả
         private void ThemDocGia_Click(object sender, RoutedEventArgs e)
         {
-            if (!KiemTraForm()) return;
+            if (!KiemTraForm())
+                return;
 
-            int ma = danhSachDocGia.Count == 0 ? 1 : danhSachDocGia.Max(d => d.MaDocGia) + 1;
-
-            danhSachDocGia.Add(new DocGiaHienThi
+            DocGiaDTO docGia = new DocGiaDTO
             {
-                MaDocGia = ma,
-                HoTen = txtHoTen.Text.Trim(),
-                NgaySinh = txtNgaySinh.Text.Trim(),
-                GioiTinh = (cbGioiTinh.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "",
-                SoDienThoai = txtSoDienThoai.Text.Trim()
-            });
+                MaDocGia = txtMaDocGia.Text.Trim(),
+                TenDocGia = txtHoTen.Text.Trim(),
+                SoDienThoai = txtSoDienThoai.Text.Trim(),
+                DiaChi = txtDiaChi.Text.Trim()
+            };
 
-            NhapLai();
-            txtThongBaoDG.Text = "Thêm độc giả thành công!";
+            bool ketQua = docGiaBLL.ThemDocGia(
+                docGia, out string thongBao);
+
+            txtThongBaoDG.Text = thongBao;
+
+            if (ketQua)
+            {
+                TaiDanhSachDocGia();
+                NhapLai();
+                txtThongBaoDG.Text = thongBao;
+            }
         }
 
+        // 3. Sửa thông tin độc giả
         private void SuaDocGia_Click(object sender, RoutedEventArgs e)
         {
-            if (dgDocGia.SelectedItem is not DocGiaHienThi docGia)
+            if (dgDocGia.SelectedItem is not DocGiaDTO docGia)
             {
                 MessageBox.Show("Vui lòng chọn độc giả cần sửa!");
                 return;
             }
 
-            if (!KiemTraForm()) return;
+            if (!KiemTraForm())
+                return;
 
-            docGia.HoTen = txtHoTen.Text.Trim();
-            docGia.NgaySinh = txtNgaySinh.Text.Trim();
-            docGia.GioiTinh = (cbGioiTinh.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "";
+            // Giữ nguyên mã độc giả đã chọn
+            docGia.TenDocGia = txtHoTen.Text.Trim();
             docGia.SoDienThoai = txtSoDienThoai.Text.Trim();
+            docGia.DiaChi = txtDiaChi.Text.Trim();
 
-            dgDocGia.Items.Refresh();
-            NhapLai();
-            txtThongBaoDG.Text = "Cập nhật độc giả thành công!";
+            bool ketQua = docGiaBLL.SuaDocGia(
+                docGia, out string thongBao);
+
+            txtThongBaoDG.Text = thongBao;
+
+            if (ketQua)
+            {
+                TaiDanhSachDocGia();
+                NhapLai();
+                txtThongBaoDG.Text = thongBao;
+            }
         }
 
+        // 4. Xóa độc giả
         private void XoaDocGia_Click(object sender, RoutedEventArgs e)
         {
-            if (dgDocGia.SelectedItem is not DocGiaHienThi docGia)
+            if (dgDocGia.SelectedItem is not DocGiaDTO docGia)
             {
                 MessageBox.Show("Vui lòng chọn độc giả cần xóa!");
                 return;
             }
 
-            if (MessageBox.Show("Bạn có chắc muốn xóa độc giả này?", "Xác nhận",
-                MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            MessageBoxResult xacNhan = MessageBox.Show(
+                "Bạn có chắc muốn xóa độc giả " +
+                docGia.TenDocGia + "?",
+                "Xác nhận xóa",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (xacNhan != MessageBoxResult.Yes)
+                return;
+
+            bool ketQua = docGiaBLL.XoaDocGia(
+                docGia.MaDocGia, out string thongBao);
+
+            txtThongBaoDG.Text = thongBao;
+
+            if (ketQua)
             {
-                danhSachDocGia.Remove(docGia);
+                TaiDanhSachDocGia();
                 NhapLai();
-                txtThongBaoDG.Text = "Xóa độc giả thành công!";
+                txtThongBaoDG.Text = thongBao;
             }
         }
 
+        // 5. Kiểm tra dữ liệu nhập
         private bool KiemTraForm()
         {
-            if (string.IsNullOrWhiteSpace(txtHoTen.Text) ||
-                string.IsNullOrWhiteSpace(txtNgaySinh.Text) ||
-                string.IsNullOrWhiteSpace(txtSoDienThoai.Text))
+            if (string.IsNullOrWhiteSpace(txtMaDocGia.Text) ||
+                string.IsNullOrWhiteSpace(txtHoTen.Text))
             {
-                MessageBox.Show("Vui lòng nhập đầy đủ thông tin độc giả!");
+                MessageBox.Show(
+                    "Vui lòng nhập mã độc giả và họ tên!");
+
                 return false;
             }
 
-            if (!System.DateTime.TryParseExact(txtNgaySinh.Text.Trim(),
-                "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None, out _))
-            {
-                MessageBox.Show("Ngày sinh phải có định dạng dd/MM/yyyy!");
-                return false;
-            }
+            string soDienThoai = txtSoDienThoai.Text.Trim();
 
-            if (txtSoDienThoai.Text.Trim().Length < 9 ||
-                !txtSoDienThoai.Text.Trim().All(char.IsDigit))
+            if (soDienThoai.Length > 0 &&
+                (soDienThoai.Length != 10 ||
+                 soDienThoai[0] != '0' ||
+                 !soDienThoai.All(char.IsDigit)))
             {
-                MessageBox.Show("Số điện thoại không hợp lệ!");
+                MessageBox.Show(
+                    "Số điện thoại phải có 10 chữ số và bắt đầu bằng 0!");
+
                 return false;
             }
 
             return true;
         }
 
-        private void dgDocGia_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        // 6. Chọn độc giả trên bảng
+        private void dgDocGia_SelectionChanged(
+            object sender, SelectionChangedEventArgs e)
         {
-            if (dgDocGia.SelectedItem is DocGiaHienThi docGia)
+            if (dgDocGia.SelectedItem is DocGiaDTO docGia)
             {
-                txtHoTen.Text = docGia.HoTen;
-                txtNgaySinh.Text = docGia.NgaySinh;
+                txtMaDocGia.Text = docGia.MaDocGia;
+                txtHoTen.Text = docGia.TenDocGia;
                 txtSoDienThoai.Text = docGia.SoDienThoai;
+                txtDiaChi.Text = docGia.DiaChi;
 
-                foreach (ComboBoxItem item in cbGioiTinh.Items)
-                {
-                    if (item.Content.ToString() == docGia.GioiTinh)
-                    {
-                        cbGioiTinh.SelectedItem = item;
-                        break;
-                    }
-                }
+                // Không cho sửa mã khi đang cập nhật
+                txtMaDocGia.IsReadOnly = true;
             }
         }
 
+        // 7. Tìm kiếm độc giả
         private void TimKiemDG_Click(object sender, RoutedEventArgs e)
         {
-            string tuKhoa = txtTimKiemDG.Text.Trim();
+            try
+            {
+                string tuKhoa = txtTimKiemDG.Text.Trim();
 
-            dgDocGia.ItemsSource = string.IsNullOrWhiteSpace(tuKhoa)
-                ? danhSachDocGia
-                : danhSachDocGia.Where(d =>
-                    d.HoTen.Contains(tuKhoa, System.StringComparison.OrdinalIgnoreCase) ||
-                    d.SoDienThoai.Contains(tuKhoa) ||
-                    d.MaDocGia.ToString().Contains(tuKhoa)).ToList();
+                dgDocGia.ItemsSource = string.IsNullOrWhiteSpace(tuKhoa)
+                    ? docGiaBLL.LayDanhSachDocGia()
+                    : docGiaBLL.TimDocGia(tuKhoa);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Lỗi tìm kiếm: " + ex.Message);
+            }
         }
 
+        // 8. Hiển thị tất cả độc giả
         private void HienTatCaDG_Click(object sender, RoutedEventArgs e)
         {
-            dgDocGia.ItemsSource = danhSachDocGia;
             txtTimKiemDG.Clear();
+            TaiDanhSachDocGia();
         }
 
+        // 9. Nhập lại thông tin
         private void NhapLai_Click(object sender, RoutedEventArgs e)
         {
             NhapLai();
@@ -149,21 +209,15 @@ namespace QuanLyThuVien.GUI.Views
 
         private void NhapLai()
         {
+            txtMaDocGia.Clear();
             txtHoTen.Clear();
-            txtNgaySinh.Clear();
             txtSoDienThoai.Clear();
-            cbGioiTinh.SelectedIndex = 0;
+            txtDiaChi.Clear();
+
+            txtMaDocGia.IsReadOnly = false;
+
             dgDocGia.SelectedItem = null;
             txtThongBaoDG.Text = "";
         }
-    }
-
-    public class DocGiaHienThi
-    {
-        public int MaDocGia { get; set; }
-        public string HoTen { get; set; } = "";
-        public string NgaySinh { get; set; } = "";
-        public string GioiTinh { get; set; } = "";
-        public string SoDienThoai { get; set; } = "";
     }
 }
