@@ -62,10 +62,11 @@ namespace QuanLyThuVien.BLL
             try
             {
                 DataTable dt = thongKeDAL.LayDanhSachDocGiaQuaHan();
+                var danhSachTam = new List<DocGiaQuaHanDTO>();
 
                 foreach (DataRow row in dt.Rows)
                 {
-                    ketQua.Add(new DocGiaQuaHanDTO
+                    danhSachTam.Add(new DocGiaQuaHanDTO
                     {
                         MaDocGia = row["MaDocGia"].ToString() ?? string.Empty,
                         TenDocGia = row["TenDocGia"].ToString() ?? string.Empty,
@@ -75,6 +76,20 @@ namespace QuanLyThuVien.BLL
                         TienPhatDuKien = Convert.ToDecimal(row["TienPhatDuKien"])
                     });
                 }
+
+                // Gộp theo MaPhieu để tránh trùng dòng khi 1 phiếu mượn nhiều đầu sách
+                ketQua = danhSachTam
+                    .GroupBy(x => x.MaPhieu, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => new DocGiaQuaHanDTO
+                    {
+                        MaDocGia = g.First().MaDocGia,
+                        TenDocGia = g.First().TenDocGia,
+                        MaPhieu = g.First().MaPhieu,
+                        HanTra = g.First().HanTra,
+                        SoNgayTre = g.First().SoNgayTre,
+                        TienPhatDuKien = g.Sum(x => x.TienPhatDuKien)
+                    })
+                    .ToList();
 
                 thongBao = string.Empty;
                 return true;

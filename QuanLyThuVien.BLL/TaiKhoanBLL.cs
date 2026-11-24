@@ -5,7 +5,6 @@ namespace QuanLyThuVien.BLL
 {
     public class TaiKhoanBLL
     {
-        // Giá trị cột Quyen trong bảng TaiKhoan - sửa cho khớp dữ liệu của bạn
         public const string QuyenAdmin = "Admin";
 
         private readonly TaiKhoanDAL taiKhoanDAL;
@@ -31,7 +30,6 @@ namespace QuanLyThuVien.BLL
                 return false;
             }
 
-            // Không Trim mật khẩu vì khoảng trắng có thể là một phần của mật khẩu
             if (string.IsNullOrEmpty(matKhau))
             {
                 thongBao = "Mật khẩu không được để trống.";
