@@ -12,7 +12,7 @@ namespace QuanLyThuVien.GUI.Views
 {
     public partial class QuanLyMuonTra : UserControl
     {
-        private readonly PhieuMuonBLL phieuMuonBLL = new PhieuMuonBLL();
+        private readonly PhieuMuonBLL phieuMuonBLL = new();
 
         private List<PhieuMuonHienThi> danhSachPhieu = new();
 
@@ -32,7 +32,7 @@ namespace QuanLyThuVien.GUI.Views
         {
             try
             {
-                danhSachPhieu.Clear();
+                List<PhieuMuonHienThi> danhSachMoi = new();
 
                 List<PhieuMuonDTO> dsPhieu =
                     phieuMuonBLL.LayDanhSachPhieuMuon();
@@ -42,9 +42,11 @@ namespace QuanLyThuVien.GUI.Views
                     List<ChiTietPhieuMuonDTO> dsChiTiet =
                         phieuMuonBLL.LayChiTietCuaPhieu(phieu.MaPhieu);
 
-                    // Trang thai tong cua phieu
                     bool conSachChuaTra = dsChiTiet.Any(
-                        ct => ct.TrangThai == "Đang mượn");
+                        ct => string.Equals(
+                            ct.TrangThai,
+                            "Đang mượn",
+                            StringComparison.OrdinalIgnoreCase));
 
                     string trangThai;
 
@@ -62,21 +64,23 @@ namespace QuanLyThuVien.GUI.Views
                         trangThai = "Đang mượn";
                     }
 
-                    // Moi dong chi tiet hien thi mot dong tren DataGrid
                     foreach (ChiTietPhieuMuonDTO ct in dsChiTiet)
                     {
-                        danhSachPhieu.Add(new PhieuMuonHienThi
+                        danhSachMoi.Add(new PhieuMuonHienThi
                         {
-                            MaPhieu = phieu.MaPhieu,
+                            MaPhieu = phieu.MaPhieu ?? "",
                             MaDocGia = phieu.MaDocGia ?? "",
-                            MaSach = ct.MaSach,
+                            MaSach = ct.MaSach ?? "",
                             SoLuongMuon = ct.SoLuongMuon,
 
                             NgayMuon = phieu.NgayMuon?.ToString("dd/MM/yyyy") ?? "",
                             HanTra = phieu.HanTra?.ToString("dd/MM/yyyy") ?? "",
                             NgayTra = ct.NgayTra?.ToString("dd/MM/yyyy") ?? "",
 
-                            TrangThai = ct.TrangThai == "Đã trả"
+                            TrangThai = string.Equals(
+                                ct.TrangThai,
+                                "Đã trả",
+                                StringComparison.OrdinalIgnoreCase)
                                 ? "Đã trả"
                                 : trangThai,
 
@@ -84,12 +88,12 @@ namespace QuanLyThuVien.GUI.Views
                         });
                     }
 
-                    // Truong hop phieu chua co chi tiet
+                    // Phieu chua co chi tiet
                     if (dsChiTiet.Count == 0)
                     {
-                        danhSachPhieu.Add(new PhieuMuonHienThi
+                        danhSachMoi.Add(new PhieuMuonHienThi
                         {
-                            MaPhieu = phieu.MaPhieu,
+                            MaPhieu = phieu.MaPhieu ?? "",
                             MaDocGia = phieu.MaDocGia ?? "",
                             NgayMuon = phieu.NgayMuon?.ToString("dd/MM/yyyy") ?? "",
                             HanTra = phieu.HanTra?.ToString("dd/MM/yyyy") ?? "",
@@ -97,6 +101,8 @@ namespace QuanLyThuVien.GUI.Views
                         });
                     }
                 }
+
+                danhSachPhieu = danhSachMoi;
 
                 dgMuonTra.ItemsSource = null;
                 dgMuonTra.ItemsSource = danhSachPhieu;
@@ -106,8 +112,9 @@ namespace QuanLyThuVien.GUI.Views
             catch (Exception ex)
             {
                 MessageBox.Show(
-                    "Khong the tai danh sach phieu muon: " + ex.Message,
-                    "Loi",
+                    "Khong the tai danh sach phieu muon tu SQL Server:\n\n" +
+                    ex.Message,
+                    "Loi ket noi du lieu",
                     MessageBoxButton.OK,
                     MessageBoxImage.Error);
             }
@@ -133,6 +140,8 @@ namespace QuanLyThuVien.GUI.Views
             }
 
             string maPhieu = txtMaPhieu.Text.Trim();
+            string maDocGia = txtMaDocGia.Text.Trim();
+            string maSach = txtMaSach.Text.Trim();
 
             if (maPhieu.Length > 10)
             {
@@ -140,15 +149,15 @@ namespace QuanLyThuVien.GUI.Views
                 return false;
             }
 
-            if (txtMaDocGia.Text.Trim().Length > 10 ||
-                txtMaSach.Text.Trim().Length > 10)
+            if (maDocGia.Length > 10 || maSach.Length > 10)
             {
                 MessageBox.Show("Ma doc gia va ma sach toi da 10 ky tu!");
                 return false;
             }
 
-            if (!int.TryParse(txtSoLuongMuon.Text.Trim(), out soLuong) ||
-                soLuong <= 0)
+            if (!int.TryParse(
+                txtSoLuongMuon.Text.Trim(),
+                out soLuong) || soLuong <= 0)
             {
                 MessageBox.Show("So luong muon phai lon hon 0!");
                 return false;
@@ -161,7 +170,8 @@ namespace QuanLyThuVien.GUI.Views
                 DateTimeStyles.None,
                 out ngayMuon))
             {
-                MessageBox.Show("Ngay muon khong hop le! Dinh dang dd/MM/yyyy.");
+                MessageBox.Show(
+                    "Ngay muon khong hop le! Dinh dang dd/MM/yyyy.");
                 return false;
             }
 
@@ -172,7 +182,14 @@ namespace QuanLyThuVien.GUI.Views
                 DateTimeStyles.None,
                 out hanTra))
             {
-                MessageBox.Show("Han tra khong hop le! Dinh dang dd/MM/yyyy.");
+                MessageBox.Show(
+                    "Han tra khong hop le! Dinh dang dd/MM/yyyy.");
+                return false;
+            }
+
+            if (ngayMuon.Date > DateTime.Today)
+            {
+                MessageBox.Show("Ngay muon khong duoc lon hon ngay hien tai!");
                 return false;
             }
 
@@ -196,9 +213,8 @@ namespace QuanLyThuVien.GUI.Views
                 return;
             }
 
-            PhieuMuonDTO phieu = new PhieuMuonDTO
+            PhieuMuonDTO phieu = new()
             {
-                // De trong thi BLL tu sinh ma PM001, PM002...
                 MaPhieu = txtMaPhieu.Text.Trim(),
                 MaDocGia = txtMaDocGia.Text.Trim(),
                 NgayMuon = ngayMuon,
@@ -223,7 +239,11 @@ namespace QuanLyThuVien.GUI.Views
                     dsChiTiet,
                     out string thongBao);
 
-                MessageBox.Show(thongBao);
+                MessageBox.Show(
+                    thongBao,
+                    ketQua ? "Thanh cong" : "That bai",
+                    MessageBoxButton.OK,
+                    ketQua ? MessageBoxImage.Information : MessageBoxImage.Warning);
 
                 if (ketQua)
                 {
@@ -233,7 +253,11 @@ namespace QuanLyThuVien.GUI.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Loi tao phieu: " + ex.Message);
+                MessageBox.Show(
+                    "Loi tao phieu muon:\n\n" + ex.Message,
+                    "Loi SQL",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
 
@@ -263,7 +287,6 @@ namespace QuanLyThuVien.GUI.Views
 
             try
             {
-                // BLL va DAL tu cap nhat ngay tra, tien phat va kho sach
                 bool ketQua = phieuMuonBLL.TraSach(
                     phieu.MaPhieu,
                     out string thongBao);
@@ -278,12 +301,15 @@ namespace QuanLyThuVien.GUI.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Loi tra sach: " + ex.Message);
+                MessageBox.Show(
+                    "Loi tra sach:\n\n" + ex.Message,
+                    "Loi SQL",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
 
         // 5. Xoa phieu
-        // BLL va DAL hien chua co chuc nang xoa phieu.
         private void XoaPhieu_Click(object sender, RoutedEventArgs e)
         {
             MessageBox.Show(
@@ -329,16 +355,16 @@ namespace QuanLyThuVien.GUI.Views
             }
 
             var ketQua = danhSachPhieu.Where(p =>
-                p.MaPhieu.Contains(
+                (p.MaPhieu ?? "").Contains(
                     tuKhoa, StringComparison.OrdinalIgnoreCase) ||
 
-                p.MaDocGia.Contains(
+                (p.MaDocGia ?? "").Contains(
                     tuKhoa, StringComparison.OrdinalIgnoreCase) ||
 
-                p.MaSach.Contains(
+                (p.MaSach ?? "").Contains(
                     tuKhoa, StringComparison.OrdinalIgnoreCase) ||
 
-                p.TrangThai.Contains(
+                (p.TrangThai ?? "").Contains(
                     tuKhoa, StringComparison.OrdinalIgnoreCase)
             ).ToList();
 
