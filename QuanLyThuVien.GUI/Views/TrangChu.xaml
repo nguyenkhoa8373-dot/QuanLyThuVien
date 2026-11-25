@@ -147,7 +147,7 @@
                               CanUserResizeRows="False"
                               SelectionMode="Single"
                               SelectionUnit="FullRow"
-                              Height="210"
+                              MinHeight="210"
                               HeadersVisibility="Column"
                               GridLinesVisibility="Horizontal"
                               HorizontalGridLinesBrush="#E5E7EB"
@@ -237,8 +237,9 @@
                                                 Width="*"
                                                 MinWidth="90"/>
 
+                            <!-- SỬA: bind NgayMuonText (string dd/MM/yyyy) thay vì NgayMuon (DateTime) -->
                             <DataGridTextColumn Header="Ngày mượn"
-                                                Binding="{Binding NgayMuon}"
+                                                Binding="{Binding NgayMuonText}"
                                                 Width="*"
                                                 MinWidth="110"/>
 

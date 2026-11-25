@@ -168,7 +168,7 @@
 
                     <TextBlock x:Name="txtThongBao"
                                FontSize="10"
-                               Foreground="#16A34A"
+                               Foreground="#374151"
                                Margin="3,7,0,0"
                                TextWrapping="Wrap"/>
 
@@ -224,7 +224,7 @@
                               CanUserAddRows="False"
                               CanUserDeleteRows="False"
                               SelectionMode="Single"
-                              Height="220"
+                              MinHeight="220"
                               ScrollViewer.HorizontalScrollBarVisibility="Auto"
                               ScrollViewer.VerticalScrollBarVisibility="Auto"
                               SelectionChanged="dgSach_SelectionChanged">

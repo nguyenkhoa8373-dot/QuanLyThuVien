@@ -69,9 +69,10 @@
                                        Foreground="#374151"
                                        FontSize="12"/>
 
+                            <!-- SỬA: MaxLength 15 -> 10 cho khop KiemTraForm -->
                             <TextBox x:Name="txtSoDienThoai"
                                      Height="32"
-                                     MaxLength="15"
+                                     MaxLength="10"
                                      Margin="0,5,10,8"
                                      Padding="7,0"
                                      VerticalContentAlignment="Center"/>
@@ -138,8 +139,9 @@
 
                     </WrapPanel>
 
+                    <!-- SỬA: doi mau trung tinh de khong gay hieu nham khi hien thi loi -->
                     <TextBlock x:Name="txtThongBaoDG"
-                               Foreground="#16A34A"
+                               Foreground="#374151"
                                FontSize="12"
                                Margin="5,8,0,0"
                                TextWrapping="Wrap"/>
@@ -163,12 +165,14 @@
                     <!-- Tìm kiếm -->
                     <WrapPanel Margin="0,0,0,12">
 
+                        <!-- SỬA: them ToolTip goi y -->
                         <TextBox x:Name="txtTimKiemDG"
                                  Width="250"
                                  Height="32"
                                  Padding="7,0"
                                  VerticalContentAlignment="Center"
-                                 Margin="0,0,10,5"/>
+                                 Margin="0,0,10,5"
+                                 ToolTip="Tìm theo mã, tên hoặc số điện thoại"/>
 
                         <Button Content="Tìm kiếm"
                                 Width="100"
@@ -193,6 +197,7 @@
                     </WrapPanel>
 
                     <!-- Bảng dữ liệu -->
+                    <!-- SỬA: Height -> MinHeight de co gian theo cua so -->
                     <DataGrid x:Name="dgDocGia"
                               AutoGenerateColumns="False"
                               IsReadOnly="True"
@@ -201,7 +206,7 @@
                               CanUserResizeRows="False"
                               SelectionMode="Single"
                               SelectionUnit="FullRow"
-                              Height="300"
+                              MinHeight="300"
                               HeadersVisibility="Column"
                               GridLinesVisibility="Horizontal"
                               HorizontalGridLinesBrush="#E5E7EB"
