@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -20,7 +19,6 @@ namespace QuanLyThuVien.GUI.Views
         {
             InitializeComponent();
 
-            // Ngay tra va tien phat do SQL cap nhat
             txtNgayTra.IsReadOnly = true;
             txtTienPhat.IsReadOnly = true;
 
@@ -48,24 +46,43 @@ namespace QuanLyThuVien.GUI.Views
                             "Đang mượn",
                             StringComparison.OrdinalIgnoreCase));
 
-                    string trangThai;
-
+                    // SỬA: tinh trang thai cap phieu (dung cho phieu khong co chi tiet)
+                    string trangThaiPhieu;
                     if (!conSachChuaTra)
                     {
-                        trangThai = "Đã trả";
+                        trangThaiPhieu = "Đã trả";
                     }
                     else if (phieu.HanTra.HasValue &&
                              phieu.HanTra.Value.Date < DateTime.Today)
                     {
-                        trangThai = "Quá hạn";
+                        trangThaiPhieu = "Quá hạn";
                     }
                     else
                     {
-                        trangThai = "Đang mượn";
+                        trangThaiPhieu = "Đang mượn";
                     }
 
                     foreach (ChiTietPhieuMuonDTO ct in dsChiTiet)
                     {
+                        // SỬA: tinh trang thai theo tung chi tiet (an toan khi mo rong)
+                        string trangThaiChiTiet;
+                        if (string.Equals(
+                                ct.TrangThai,
+                                "Đã trả",
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            trangThaiChiTiet = "Đã trả";
+                        }
+                        else if (phieu.HanTra.HasValue &&
+                                 phieu.HanTra.Value.Date < DateTime.Today)
+                        {
+                            trangThaiChiTiet = "Quá hạn";
+                        }
+                        else
+                        {
+                            trangThaiChiTiet = "Đang mượn";
+                        }
+
                         danhSachMoi.Add(new PhieuMuonHienThi
                         {
                             MaPhieu = phieu.MaPhieu ?? "",
@@ -77,12 +94,7 @@ namespace QuanLyThuVien.GUI.Views
                             HanTra = phieu.HanTra?.ToString("dd/MM/yyyy") ?? "",
                             NgayTra = ct.NgayTra?.ToString("dd/MM/yyyy") ?? "",
 
-                            TrangThai = string.Equals(
-                                ct.TrangThai,
-                                "Đã trả",
-                                StringComparison.OrdinalIgnoreCase)
-                                ? "Đã trả"
-                                : trangThai,
+                            TrangThai = trangThaiChiTiet,
 
                             TienPhat = ct.TienPhat ?? 0
                         });
@@ -97,7 +109,7 @@ namespace QuanLyThuVien.GUI.Views
                             MaDocGia = phieu.MaDocGia ?? "",
                             NgayMuon = phieu.NgayMuon?.ToString("dd/MM/yyyy") ?? "",
                             HanTra = phieu.HanTra?.ToString("dd/MM/yyyy") ?? "",
-                            TrangThai = trangThai
+                            TrangThai = trangThaiPhieu
                         });
                     }
                 }
@@ -130,7 +142,9 @@ namespace QuanLyThuVien.GUI.Views
             hanTra = DateTime.MinValue;
             soLuong = 0;
 
-            if (string.IsNullOrWhiteSpace(txtMaDocGia.Text) ||
+            // SỬA: bo sung kiem tra txtMaPhieu rong
+            if (string.IsNullOrWhiteSpace(txtMaPhieu.Text) ||
+                string.IsNullOrWhiteSpace(txtMaDocGia.Text) ||
                 string.IsNullOrWhiteSpace(txtMaSach.Text) ||
                 string.IsNullOrWhiteSpace(txtNgayMuon.Text) ||
                 string.IsNullOrWhiteSpace(txtHanTra.Text))
@@ -276,8 +290,10 @@ namespace QuanLyThuVien.GUI.Views
                 return;
             }
 
+            // CẢNH BÁO: TraSach hien tai chi nhan MaPhieu -> tra TOAN BO sach trong phieu.
+            // Neu 1 phieu co nhieu sach, can sua BLL/DAL de tra tung cuon theo MaSach.
             MessageBoxResult xacNhan = MessageBox.Show(
-                "Xac nhan tra sach cua phieu " + phieu.MaPhieu + "?",
+                "Xac nhan tra TOAN BO sach cua phieu " + phieu.MaPhieu + "?",
                 "Xac nhan tra sach",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
@@ -312,6 +328,8 @@ namespace QuanLyThuVien.GUI.Views
         // 5. Xoa phieu
         private void XoaPhieu_Click(object sender, RoutedEventArgs e)
         {
+            // CẢNH BÁO: chuc nang chua duoc ho tro trong BLL/DAL.
+            // Can bo sung XoaPhieu (xoa ChiTietPhieuMuon truoc, roi xoa PhieuMuon, trong transaction).
             MessageBox.Show(
                 "Chuc nang xoa phieu chua duoc ho tro trong BLL va DAL.\n" +
                 "Can bo sung xu ly xoa phieu va hoan kho trong SQL truoc.",
@@ -340,6 +358,14 @@ namespace QuanLyThuVien.GUI.Views
 
                 txtTienPhat.Text =
                     phieu.TienPhat.ToString("N0");
+
+                // SỬA: khoa ma phieu khi dang chon (tranh tao nham phieu moi)
+                txtMaPhieu.IsReadOnly = true;
+            }
+            else
+            {
+                // SỬA: mo khoa khi bo chon
+                txtMaPhieu.IsReadOnly = false;
             }
         }
 
@@ -350,6 +376,7 @@ namespace QuanLyThuVien.GUI.Views
 
             if (string.IsNullOrWhiteSpace(tuKhoa))
             {
+                dgMuonTra.ItemsSource = null;      // SỬA: reset
                 dgMuonTra.ItemsSource = danhSachPhieu;
                 return;
             }
@@ -368,6 +395,7 @@ namespace QuanLyThuVien.GUI.Views
                     tuKhoa, StringComparison.OrdinalIgnoreCase)
             ).ToList();
 
+            dgMuonTra.ItemsSource = null;          // SỬA: reset
             dgMuonTra.ItemsSource = ketQua;
         }
 
@@ -375,6 +403,7 @@ namespace QuanLyThuVien.GUI.Views
         private void HienTatCaMT_Click(object sender, RoutedEventArgs e)
         {
             txtTimKiemMT.Clear();
+            dgMuonTra.ItemsSource = null;          // SỬA: reset
             dgMuonTra.ItemsSource = danhSachPhieu;
         }
 
@@ -403,7 +432,6 @@ namespace QuanLyThuVien.GUI.Views
         }
     }
 
-    // Lop du lieu chi hien thi tren giao dien
     public class PhieuMuonHienThi
     {
         public string MaPhieu { get; set; } = "";

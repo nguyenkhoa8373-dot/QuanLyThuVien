@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using QuanLyThuVien.BLL;
@@ -7,16 +6,16 @@ using QuanLyThuVien.DTO;
 
 namespace QuanLyThuVien.GUI.Views
 {
+    // CANH BAO: Ten class la QuanLyMuonSach nhung noi dung la CRUD sach.
+    // Neu day la form quan ly kho sach, nen doi ten thanh QuanLySach.
+    // Neu day la form muon/tra, can viet lai hoan toan voi MuonTraBLL.
     public partial class QuanLyMuonSach : UserControl
     {
-        // Goi lop xu ly nghiep vu SachBLL
         private readonly SachBLL sachBLL = new SachBLL();
 
         public QuanLyMuonSach()
         {
             InitializeComponent();
-
-            // Tai danh sach sach tu SQL Server
             TaiDanhSachSach();
         }
 
@@ -25,6 +24,8 @@ namespace QuanLyThuVien.GUI.Views
         {
             try
             {
+                // SỬA: reset ItemsSource truoc khi gan
+                dgSach.ItemsSource = null;
                 dgSach.ItemsSource = sachBLL.LayDanhSachSach();
             }
             catch (Exception ex)
@@ -38,15 +39,17 @@ namespace QuanLyThuVien.GUI.Views
         }
 
         // 2. Kiem tra du lieu nhap
-        private bool KiemTraForm(out int soLuong)
+        // SỬA: them tham so kiemTraMa
+        private bool KiemTraForm(out int soLuong, bool kiemTraMa = true)
         {
             soLuong = 0;
 
             string maSach = txtMaSach.Text.Trim();
             string tenSach = txtTenSach.Text.Trim();
             string theLoai = txtTheLoai.Text.Trim();
+            string soLuongText = txtSoLuong.Text.Trim();
 
-            if (string.IsNullOrWhiteSpace(maSach))
+            if (kiemTraMa && string.IsNullOrWhiteSpace(maSach))
             {
                 MessageBox.Show("Vui long nhap ma sach!");
                 txtMaSach.Focus();
@@ -67,16 +70,29 @@ namespace QuanLyThuVien.GUI.Views
                 return false;
             }
 
-            if (maSach.Length > 10 ||
-                tenSach.Length > 100 ||
-                theLoai.Length > 50)
+            // SỬA: tach kiem tra do dai ma rieng
+            if (kiemTraMa && maSach.Length > 10)
+            {
+                MessageBox.Show("Ma sach khong duoc vuot qua 10 ky tu!");
+                txtMaSach.Focus();
+                return false;
+            }
+
+            if (tenSach.Length > 100 || theLoai.Length > 50)
             {
                 MessageBox.Show("Thong tin vuot qua do dai cho phep!");
                 return false;
             }
 
-            if (!int.TryParse(txtSoLuong.Text.Trim(), out soLuong)
-                || soLuong < 0)
+            // SỬA: kiem tra rong truoc khi parse
+            if (string.IsNullOrWhiteSpace(soLuongText))
+            {
+                MessageBox.Show("Vui long nhap so luong ton!");
+                txtSoLuong.Focus();
+                return false;
+            }
+
+            if (!int.TryParse(soLuongText, out soLuong) || soLuong < 0)
             {
                 MessageBox.Show("So luong ton phai la so nguyen khong am!");
                 txtSoLuong.Focus();
@@ -86,6 +102,7 @@ namespace QuanLyThuVien.GUI.Views
             if (soLuong > 100000)
             {
                 MessageBox.Show("So luong ton qua lon!");
+                txtSoLuong.Focus();
                 return false;
             }
 
@@ -95,6 +112,9 @@ namespace QuanLyThuVien.GUI.Views
         // 3. Them sach vao SQL
         private void ThemSach_Click(object sender, RoutedEventArgs e)
         {
+            // SỬA: reset thong bao
+            txtThongBao.Text = "";
+
             if (!KiemTraForm(out int soLuong))
                 return;
 
@@ -133,13 +153,25 @@ namespace QuanLyThuVien.GUI.Views
         // 4. Sua sach trong SQL
         private void SuaSach_Click(object sender, RoutedEventArgs e)
         {
+            // SỬA: reset thong bao
+            txtThongBao.Text = "";
+
             if (dgSach.SelectedItem is not SachDTO sachCu)
             {
                 MessageBox.Show("Vui long chon sach can sua!");
                 return;
             }
 
-            if (!KiemTraForm(out int soLuong))
+            // SỬA: kiem tra an toan ma sach
+            if (txtMaSach.Text.Trim() != sachCu.MaSach)
+            {
+                MessageBox.Show("Khong duoc sua ma sach!");
+                txtMaSach.Text = sachCu.MaSach;
+                return;
+            }
+
+            // SỬA: khi Sua thi khong can kiem tra lai ma
+            if (!KiemTraForm(out int soLuong, kiemTraMa: false))
                 return;
 
             SachDTO sachMoi = new SachDTO
@@ -153,9 +185,7 @@ namespace QuanLyThuVien.GUI.Views
 
             try
             {
-                bool ketQua = sachBLL.SuaSach(
-                    sachMoi,
-                    out string thongBao);
+                bool ketQua = sachBLL.SuaSach(sachMoi, out string thongBao);
 
                 MessageBox.Show(thongBao);
 
@@ -179,6 +209,9 @@ namespace QuanLyThuVien.GUI.Views
         // 5. Xoa sach trong SQL
         private void XoaSach_Click(object sender, RoutedEventArgs e)
         {
+            // SỬA: reset thong bao
+            txtThongBao.Text = "";
+
             if (dgSach.SelectedItem is not SachDTO sach)
             {
                 MessageBox.Show("Vui long chon sach can xoa!");
@@ -230,11 +263,15 @@ namespace QuanLyThuVien.GUI.Views
                 txtMaSach.Text = sach.MaSach;
                 txtTenSach.Text = sach.TenSach;
                 txtTheLoai.Text = sach.TheLoai ?? "";
-                txtSoLuong.Text =
-                    (sach.SoLuongTon ?? 0).ToString();
+                txtSoLuong.Text = (sach.SoLuongTon ?? 0).ToString();
 
                 // Khong cho sua ma sach
                 txtMaSach.IsReadOnly = true;
+            }
+            else
+            {
+                // SỬA: khi bo chon thi mo khoa lai ma
+                txtMaSach.IsReadOnly = false;
             }
         }
 
@@ -245,8 +282,18 @@ namespace QuanLyThuVien.GUI.Views
             {
                 string tuKhoa = txtTimKiem.Text.Trim();
 
+                // SỬA: neu tu khoa rong thi hien thi tat ca
+                if (string.IsNullOrWhiteSpace(tuKhoa))
+                {
+                    TaiDanhSachSach();
+                    txtThongBao.Text = "Da hien thi tat ca sach.";
+                    return;
+                }
+
                 var ketQua = sachBLL.TimSach(tuKhoa);
 
+                // SỬA: reset ItemsSource truoc khi gan
+                dgSach.ItemsSource = null;
                 dgSach.ItemsSource = ketQua;
 
                 txtThongBao.Text =
@@ -266,9 +313,7 @@ namespace QuanLyThuVien.GUI.Views
         private void HienTatCa_Click(object sender, RoutedEventArgs e)
         {
             txtTimKiem.Clear();
-
             TaiDanhSachSach();
-
             txtThongBao.Text = "Da hien thi tat ca sach.";
         }
 

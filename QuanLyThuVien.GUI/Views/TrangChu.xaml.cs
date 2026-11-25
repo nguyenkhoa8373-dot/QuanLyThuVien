@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Windows;
@@ -12,7 +11,6 @@ namespace QuanLyThuVien.GUI.Views
 {
     public partial class TrangChu : UserControl
     {
-        // Khoi tao cac lop BLL de lay du lieu tu SQL Server
         private readonly SachBLL sachBLL = new SachBLL();
         private readonly DocGiaBLL docGiaBLL = new DocGiaBLL();
         private readonly PhieuMuonBLL phieuMuonBLL = new PhieuMuonBLL();
@@ -20,7 +18,6 @@ namespace QuanLyThuVien.GUI.Views
         public TrangChu()
         {
             InitializeComponent();
-
             TaiDuLieuTuSQL();
         }
 
@@ -29,34 +26,25 @@ namespace QuanLyThuVien.GUI.Views
         {
             try
             {
-                // Lay danh sach sach
                 var danhSachSach = sachBLL.LayDanhSachSach();
-
-                // Lay danh sach doc gia
                 var danhSachDocGia = docGiaBLL.LayDanhSachDocGia();
-
-                // Lay danh sach phieu muon
                 var danhSachPhieu = phieuMuonBLL.LayDanhSachPhieuMuon();
 
-                // Lay chi tiet tung phieu
-                var duLieuPhieu = danhSachPhieu.Select(p => new
+                // SỬA: dung class thay vi anonymous type + dynamic
+                var duLieuPhieu = danhSachPhieu.Select(p => new PhieuVaChiTiet
                 {
                     Phieu = p,
                     ChiTiet = phieuMuonBLL.LayChiTietCuaPhieu(p.MaPhieu)
                 }).ToList();
 
-                // Cap nhat thong ke
-                CapNhatThongKe(
+                // SỬA: gop cap nhat thong ke + thong bao
+                CapNhatThongKeVaThongBao(
                     danhSachSach.Count,
                     danhSachDocGia.Count,
                     duLieuPhieu
                 );
 
-                // Hien thi hoat dong gan day
                 HienThiHoatDongGanDay(duLieuPhieu);
-
-                // Cap nhat thong bao
-                CapNhatThongBao(duLieuPhieu);
             }
             catch (Exception ex)
             {
@@ -69,36 +57,28 @@ namespace QuanLyThuVien.GUI.Views
             }
         }
 
-        // Kiem tra phieu con sach chua tra
-        private bool ConSachChuaTra(dynamic chiTiet)
+        // SỬA: kieu tuong minh, khong dynamic
+        private bool ConSachChuaTra(List<ChiTietPhieuMuonDTO> chiTiet)
         {
-            return chiTiet.Any((Func<ChiTietPhieuMuonDTO, bool>)(ct =>
-                ct.TrangThai == "Đang mượn"));
+            return chiTiet.Any(ct => ct.TrangThai == "Đang mượn");
         }
 
-        // Cap nhat cac the thong ke
-        private void CapNhatThongKe(
-            int tongSach,
-            int tongDocGia,
-            dynamic duLieuPhieu)
+        // SỬA: tach ham tinh thong ke dung chung
+        private (int dangMuon, int quaHan) TinhThongKe(List<PhieuVaChiTiet> duLieuPhieu)
         {
             int dangMuon = 0;
             int quaHan = 0;
 
             foreach (var item in duLieuPhieu)
             {
-                bool conSach = item.ChiTiet.Any(
-                    (Func<ChiTietPhieuMuonDTO, bool>)(ct =>
-                        ct.TrangThai == "Đang mượn"));
+                bool conSach = ConSachChuaTra(item.ChiTiet);
 
-                // Tinh ca truong hop phieu khong co chi tiet tra ve
                 if (!conSach && item.ChiTiet.Count == 0)
                     conSach = item.Phieu.TrangThai == "Đang mượn";
 
                 if (conSach)
                 {
                     dangMuon++;
-
                     if (item.Phieu.HanTra.HasValue &&
                         item.Phieu.HanTra.Value.Date < DateTime.Today)
                     {
@@ -107,16 +87,34 @@ namespace QuanLyThuVien.GUI.Views
                 }
             }
 
+            return (dangMuon, quaHan);
+        }
+
+        // SỬA: gop 2 ham thanh 1, tranh lap logic
+        private void CapNhatThongKeVaThongBao(
+            int tongSach,
+            int tongDocGia,
+            List<PhieuVaChiTiet> duLieuPhieu)
+        {
+            var (dangMuon, quaHan) = TinhThongKe(duLieuPhieu);
+
             txtTongSach.Text = tongSach.ToString();
             txtTongDocGia.Text = tongDocGia.ToString();
             txtDangMuon.Text = dangMuon.ToString();
             txtQuaHan.Text = quaHan.ToString();
+
+            txtThongBao1.Text = "• Hiện có " + dangMuon + " lượt mượn chưa trả.";
+            txtThongBao2.Text = "• Hiện có " + quaHan + " lượt mượn quá hạn.";
+            txtThongBao3.Text = quaHan > 0
+                ? "• Có sách đang quá hạn cần được xử lý."
+                : "• Hệ thống đang hoạt động bình thường.";
         }
 
         // Hien thi danh sach hoat dong gan day
-        private void HienThiHoatDongGanDay(dynamic duLieuPhieu)
+        private void HienThiHoatDongGanDay(List<PhieuVaChiTiet> duLieuPhieu)
         {
-            var danhSachHoatDong = new List<object>();
+            // SỬA: dung class co kieu tuong minh thay vi anonymous + reflection
+            var danhSachHoatDong = new List<HoatDongHienThi>();
 
             foreach (var item in duLieuPhieu)
             {
@@ -124,17 +122,14 @@ namespace QuanLyThuVien.GUI.Views
 
                 if (item.ChiTiet.Count == 0)
                 {
-                    danhSachHoatDong.Add(new
+                    danhSachHoatDong.Add(new HoatDongHienThi
                     {
                         MaPhieu = phieu.MaPhieu,
                         MaDocGia = phieu.MaDocGia,
                         MaSach = "-",
-                        NgayMuon = phieu.NgayMuon.HasValue
-                            ? phieu.NgayMuon.Value.ToString("dd/MM/yyyy")
-                            : "",
+                        NgayMuon = phieu.NgayMuon ?? DateTime.MinValue,
                         TrangThai = phieu.TrangThai ?? ""
                     });
-
                     continue;
                 }
 
@@ -149,81 +144,38 @@ namespace QuanLyThuVien.GUI.Views
                         trangThai = "Quá hạn";
                     }
 
-                    danhSachHoatDong.Add(new
+                    danhSachHoatDong.Add(new HoatDongHienThi
                     {
                         MaPhieu = phieu.MaPhieu,
                         MaDocGia = phieu.MaDocGia,
                         MaSach = ct.MaSach,
-                        NgayMuon = phieu.NgayMuon.HasValue
-                            ? phieu.NgayMuon.Value.ToString("dd/MM/yyyy")
-                            : "",
+                        NgayMuon = phieu.NgayMuon ?? DateTime.MinValue,
                         TrangThai = trangThai
                     });
                 }
             }
 
+            // SỬA: sap xep truc tiep, khong reflection
             dgHoatDong.ItemsSource = danhSachHoatDong
-                .OrderByDescending(x =>
-                {
-                    var ngay = x.GetType()
-                        .GetProperty("NgayMuon")
-                        .GetValue(x)?.ToString();
-
-                    return DateTime.TryParseExact(
-                        ngay,
-                        "dd/MM/yyyy",
-                        null,
-                        System.Globalization.DateTimeStyles.None,
-                        out DateTime ketQua)
-                        ? ketQua
-                        : DateTime.MinValue;
-                })
+                .OrderByDescending(x => x.NgayMuon)
                 .ToList();
         }
+    }
 
-        // Cap nhat thong bao
-        private void CapNhatThongBao(dynamic duLieuPhieu)
-        {
-            int dangMuon = 0;
-            int quaHan = 0;
+    // SỬA: class ho tro thay cho dynamic
+    public class PhieuVaChiTiet
+    {
+        public PhieuMuonDTO Phieu { get; set; }
+        public List<ChiTietPhieuMuonDTO> ChiTiet { get; set; }
+    }
 
-            foreach (var item in duLieuPhieu)
-            {
-                bool conSach = item.ChiTiet.Any(
-                    (Func<ChiTietPhieuMuonDTO, bool>)(ct =>
-                        ct.TrangThai == "Đang mượn"));
-
-                if (!conSach && item.ChiTiet.Count == 0)
-                    conSach = item.Phieu.TrangThai == "Đang mượn";
-
-                if (conSach)
-                {
-                    dangMuon++;
-
-                    if (item.Phieu.HanTra.HasValue &&
-                        item.Phieu.HanTra.Value.Date < DateTime.Today)
-                    {
-                        quaHan++;
-                    }
-                }
-            }
-
-            txtThongBao1.Text =
-                "• Hiện có " + dangMuon + " lượt mượn chưa trả.";
-
-            txtThongBao2.Text =
-                "• Hiện có " + quaHan + " lượt mượn quá hạn.";
-
-            if (quaHan > 0)
-            {
-                txtThongBao3.Text =
-                    "• Có sách đang quá hạn cần được xử lý.";
-            }
-            else
-            {
-                txtThongBao3.Text =
-                    "• Hệ thống đang hoạt động bình thường.";
-            }
-        }
+    public class HoatDongHienThi
+    {
+        public string MaPhieu { get; set; }
+        public string MaDocGia { get; set; }
+        public string MaSach { get; set; }
+        public DateTime NgayMuon { get; set; }
+        public string NgayMuonText => NgayMuon.ToString("dd/MM/yyyy");
+        public string TrangThai { get; set; }
     }
 }

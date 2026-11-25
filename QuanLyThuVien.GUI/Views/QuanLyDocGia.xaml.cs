@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using QuanLyThuVien.DTO;
@@ -22,6 +21,8 @@ namespace QuanLyThuVien.GUI.Views
         {
             try
             {
+                // SỬA: reset ItemsSource trước khi gán mới để tránh lỗi hiển thị
+                dgDocGia.ItemsSource = null;
                 dgDocGia.ItemsSource = docGiaBLL.LayDanhSachDocGia();
                 txtThongBaoDG.Text = "";
             }
@@ -36,13 +37,14 @@ namespace QuanLyThuVien.GUI.Views
         }
 
         // 2. Kiem tra thong tin nhap
-        private bool KiemTraForm()
+        // SỬA: them tham so kiemTraMa de khi Sua khong can kiem tra lai ma
+        private bool KiemTraForm(bool kiemTraMa = true)
         {
             string ma = txtMaDocGia.Text.Trim();
             string ten = txtHoTen.Text.Trim();
             string sdt = txtSoDienThoai.Text.Trim();
 
-            if (string.IsNullOrWhiteSpace(ma))
+            if (kiemTraMa && string.IsNullOrWhiteSpace(ma))
             {
                 MessageBox.Show("Vui long nhap ma doc gia!");
                 txtMaDocGia.Focus();
@@ -63,9 +65,18 @@ namespace QuanLyThuVien.GUI.Views
                 return false;
             }
 
-            if (ma.Length > 10 || ten.Length > 100)
+            // SỬA: bo sung kiem tra do dai ma khi co kiem tra ma
+            if (kiemTraMa && ma.Length > 10)
             {
-                MessageBox.Show("Thong tin vuot qua do dai cho phep!");
+                MessageBox.Show("Ma doc gia khong duoc vuot qua 10 ky tu!");
+                txtMaDocGia.Focus();
+                return false;
+            }
+
+            if (ten.Length > 100)
+            {
+                MessageBox.Show("Ho ten khong duoc vuot qua 100 ky tu!");
+                txtHoTen.Focus();
                 return false;
             }
 
@@ -85,6 +96,9 @@ namespace QuanLyThuVien.GUI.Views
         // 3. Them doc gia vao SQL
         private void ThemDocGia_Click(object sender, RoutedEventArgs e)
         {
+            // SỬA: reset thong bao truoc khi xu ly
+            txtThongBaoDG.Text = "";
+
             if (!KiemTraForm())
                 return;
 
@@ -120,13 +134,25 @@ namespace QuanLyThuVien.GUI.Views
         // 4. Sua doc gia trong SQL
         private void SuaDocGia_Click(object sender, RoutedEventArgs e)
         {
+            // SỬA: reset thong bao
+            txtThongBaoDG.Text = "";
+
             if (dgDocGia.SelectedItem is not DocGiaDTO dgCu)
             {
                 MessageBox.Show("Vui long chon doc gia can sua!");
                 return;
             }
 
-            if (!KiemTraForm())
+            // SỬA: kiem tra an toan - khong cho ma tren form khac ma goc
+            if (txtMaDocGia.Text.Trim() != dgCu.MaDocGia)
+            {
+                MessageBox.Show("Khong duoc sua ma doc gia!");
+                txtMaDocGia.Text = dgCu.MaDocGia;
+                return;
+            }
+
+            // SỬA: khi Sua thi khong can kiem tra lai ma
+            if (!KiemTraForm(kiemTraMa: false))
                 return;
 
             DocGiaDTO dgMoi = new DocGiaDTO
@@ -161,6 +187,9 @@ namespace QuanLyThuVien.GUI.Views
         // 5. Xoa doc gia trong SQL
         private void XoaDocGia_Click(object sender, RoutedEventArgs e)
         {
+            // SỬA: reset thong bao
+            txtThongBaoDG.Text = "";
+
             if (dgDocGia.SelectedItem is not DocGiaDTO dg)
             {
                 MessageBox.Show("Vui long chon doc gia can xoa!");
@@ -224,8 +253,18 @@ namespace QuanLyThuVien.GUI.Views
             {
                 string tuKhoa = txtTimKiemDG.Text.Trim();
 
+                // SỬA: neu tu khoa rong thi hien thi tat ca
+                if (string.IsNullOrWhiteSpace(tuKhoa))
+                {
+                    LoadDocGia();
+                    txtThongBaoDG.Text = "Da hien thi tat ca doc gia.";
+                    return;
+                }
+
                 var ketQua = docGiaBLL.TimDocGia(tuKhoa);
 
+                // SỬA: reset ItemsSource truoc khi gan
+                dgDocGia.ItemsSource = null;
                 dgDocGia.ItemsSource = ketQua;
 
                 txtThongBaoDG.Text =
@@ -261,6 +300,11 @@ namespace QuanLyThuVien.GUI.Views
 
                 // Khong cho sua ma doc gia
                 txtMaDocGia.IsReadOnly = true;
+            }
+            else
+            {
+                // SỬA: khi bo chon (click vung trong) thi mo khoa lai ma
+                txtMaDocGia.IsReadOnly = false;
             }
         }
     }
